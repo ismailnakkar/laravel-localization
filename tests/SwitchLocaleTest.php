@@ -18,24 +18,18 @@ use PHPUnit\Framework\Attributes\DataProvider;
 
 final class SwitchLocaleTest extends LanguagesTestCase
 {
-    private const string MODAL = <<<'BLADE'
+    private const string BANNER = <<<'BLADE'
         @inject('localization', \Localization\Localization::class)
-        @if ($offer = $localization->accountLanguageOffer())
-            <dialog id="account-language">
+        @if ($suggestion = $localization->suggestion())
+            <aside lang="{{ $suggestion->code }}">
                 <form method="POST" action="{{ route('localization.switch') }}">
                     @csrf
                     <input type="hidden" name="to" value="{{ request()->getRequestUri() }}">
-                    <p>{{ __('Use this language for your account too?') }}</p>
-                    <button name="locale" value="{{ $localization->accountLanguage() }}" class="keep">{{ __('No, keep mine') }}</button>
-                    <button name="locale" value="{{ $offer->code }}">{{ __('Yes') }}</button>
+                    <p>{{ __('Show this site in :language?', ['language' => __("languages.{$suggestion->code}", locale: $suggestion->code)], $suggestion->code) }}</p>
+                    <button name="locale" value="{{ $suggestion->code }}">{{ __('Yes', locale: $suggestion->code) }}</button>
+                    <button name="locale" value="{{ app()->getLocale() }}">{{ __('No, thanks', locale: $suggestion->code) }}</button>
                 </form>
-            </dialog>
-            <script type="module">
-                const dialog = document.getElementById('account-language');
-                // Escape closes it without a button, and Chrome may skip the cancel event: it counts as keeping.
-                dialog.addEventListener('close', () => dialog.querySelector('form').requestSubmit(dialog.querySelector('.keep')));
-                dialog.showModal();
-            </script>
+            </aside>
         @endif
         BLADE;
 
@@ -44,11 +38,11 @@ final class SwitchLocaleTest extends LanguagesTestCase
         $locale = static fn (): string => app()->getLocale();
 
         $router->get('plain', $locale);
-        $router->get('modal', static fn (): string => Blade::render(self::MODAL));
         $router->get('plain-signed/{user}', $locale)->middleware('signed')->name('plain.signed');
         $router->localized(static function (Router $router) use ($locale): void {
             $router->get('/', $locale)->name('home');
             $router->get('terms', $locale)->name('terms');
+            $router->get('banner', static fn (): string => app()->getLocale() . Blade::render(self::BANNER));
             $router->get('prefs/{user}', $locale)->middleware('signed')->name('prefs');
             $router->get('prefs-unnamed/{user}', $locale)->middleware('signed');
         });
@@ -87,6 +81,7 @@ final class SwitchLocaleTest extends LanguagesTestCase
 
         $this->actingAs($user)->post('/locale', ['locale' => 'fr', 'to' => '/plain'])->assertStatus(303)->assertRedirect('/plain');
 
+        $this->assertSame('fr', session(ResolveLocale::PICKED_KEY));
         $this->assertSame('fr', session(ResolveLocale::SESSION_KEY));
         $this->assertSame('fr', $user->fresh()?->locale);
         $this->get('/plain')->assertContent('fr');
@@ -474,55 +469,91 @@ final class SwitchLocaleTest extends LanguagesTestCase
         $this->assertMatchesRegularExpression('~value="ar" lang="ar"\s*>العربية</button>~', $html);
     }
 
-    public function test_either_answer_to_the_readme_modal_leaves_the_page_and_the_account_in_one_language(): void
+    /** @return iterable<string, array{string, string}> the answer, where it lands */
+    public static function bannerAnswers(): iterable
     {
-        $member = User::create(['name' => 'member', 'locale' => 'ar']);
-
-        $this->actingAs($member)->get('/modal')->assertOk()->assertDontSee('<dialog', false);
-        $this->get('/fr/terms');
-        $this->get('/modal')->assertOk()
-            ->assertSee('action="http://localhost/locale"', false)
-            ->assertSee('<input type="hidden" name="to" value="/modal">', false)
-            ->assertSee('<button name="locale" value="ar" class="keep">No, keep mine</button>', false)
-            ->assertSee('<button name="locale" value="fr">Yes</button>', false);
-
-        $this->post('/locale', ['locale' => 'ar', 'to' => '/fr/terms'])->assertRedirect('/ar/terms');
-        $this->get('/modal')->assertOk()->assertDontSee('<dialog', false);
-        $this->assertSame('ar', $member->fresh()?->locale);
-
-        $this->get('/fr/terms');
-        $this->post('/locale', ['locale' => 'fr', 'to' => '/modal'])->assertRedirect('/modal');
-        $this->get('/modal')->assertOk()->assertDontSee('<dialog', false);
-        $this->assertSame('fr', $member->refresh()->locale);
-
-        $this->assertStringContainsString(self::MODAL, (string)file_get_contents(__DIR__ . '/../README.md'));
+        yield 'yes' => ['fr', '/fr/banner'];
+        yield 'no, thanks' => ['en', '/banner'];
     }
 
-    /** @return iterable<string, array{?string, string, ?string, ?string}> column, screen, accountLanguage(), offer */
-    public static function offers(): iterable
+    #[DataProvider('bannerAnswers')]
+    public function test_either_answer_to_the_readme_banner_is_a_pick(string $answer, string $lands): void
     {
-        yield 'another language on screen' => ['ar', 'fr', 'ar', 'fr'];
-        yield "the account's language on screen" => ['ar', 'ar', 'ar', null];
-        yield 'an account without one' => [null, 'fr', null, null];
-        yield 'an account holding a code no longer configured' => ['de', 'fr', null, null];
-        yield 'a language not configured on screen' => ['ar', 'de', 'ar', null];
+        $this->app->make('translator')->addLines(['languages.fr' => 'français', '*.Show this site in :language?' => 'Afficher ce site en :language ?', '*.Yes' => 'Oui', '*.No, thanks' => 'Non merci'], 'fr');
+        $this->withHeader('Accept-Language', 'fr');
+
+        $this->get('/banner')->assertOk()
+            ->assertSee('<aside lang="fr">', false)
+            ->assertSee('<input type="hidden" name="to" value="/banner">', false)
+            ->assertSee('<p>Afficher ce site en français ?</p>', false)
+            ->assertSee('<button name="locale" value="fr">Oui</button>', false)
+            ->assertSee('<button name="locale" value="en">Non merci</button>', false);
+
+        $this->post('/locale', ['locale' => $answer, 'to' => '/banner'])->assertRedirect($lands);
+
+        $this->assertSame($answer, session(ResolveLocale::PICKED_KEY));
+        $this->get($lands)->assertContent($answer);
+        // Neither the browser's language nor the answer on screen: only the pick keeps the banner away.
+        $this->get('/es/banner')->assertContent('es');
+
+        $this->assertStringContainsString(self::BANNER, (string)file_get_contents(__DIR__ . '/../README.md'));
     }
 
-    #[DataProvider('offers')]
-    public function test_the_account_language_and_its_offer(?string $column, string $screen, ?string $account, ?string $offer): void
+    /** @return iterable<string, array{?string, ?string}> column, accountLanguage() */
+    public static function accountLanguages(): iterable
+    {
+        yield 'a configured code' => ['ar', 'ar'];
+        yield 'none' => [null, null];
+        yield 'a code no longer configured' => ['de', null];
+    }
+
+    #[DataProvider('accountLanguages')]
+    public function test_the_account_language_is_a_configured_code_the_account_holds(?string $column, ?string $account): void
     {
         $this->actingAs(User::create(['name' => 'member', 'locale' => $column]));
-        $this->app->setLocale($screen);
 
         $this->assertSame($account, $this->localization()->accountLanguage());
-        $this->assertEquals($offer === null ? null : new Language($offer, true), $this->localization()->accountLanguageOffer());
     }
 
-    public function test_a_guest_has_no_account_language_and_gets_no_offer(): void
+    public function test_a_guest_has_no_account_language(): void
     {
         $this->get('/fr/terms');
 
         $this->assertNull($this->localization()->accountLanguage());
-        $this->assertNull($this->localization()->accountLanguageOffer());
+    }
+
+    /** @return iterable<string, array{string, array<string, string>, ?string}> URI, headers, suggestion() */
+    public static function suggestions(): iterable
+    {
+        yield "the browser's language, another on screen" => ['/terms', ['Accept-Language' => 'fr'], 'fr'];
+        yield "the browser's language on screen" => ['/fr/terms', ['Accept-Language' => 'fr'], null];
+        yield 'no Accept-Language' => ['/terms', [], null];
+        yield 'a browser language not configured' => ['/terms', ['Accept-Language' => 'de'], null];
+        yield 'a crawler' => ['/terms', ['Accept-Language' => 'fr', 'User-Agent' => 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'], null];
+    }
+
+    /** @param  array<string, string>  $headers */
+    #[DataProvider('suggestions')]
+    public function test_the_suggestion_is_the_browsers_language_while_another_is_on_screen(string $uri, array $headers, ?string $suggestion): void
+    {
+        $this->withHeaders($headers)->get($uri)->assertOk();
+
+        $this->assertEquals($suggestion === null ? null : new Language($suggestion, false), $this->localization()->suggestion());
+    }
+
+    public function test_a_visitor_who_picked_gets_no_suggestion(): void
+    {
+        $this->withSession([ResolveLocale::PICKED_KEY => 'en'])->withHeader('Accept-Language', 'fr')->get('/terms')->assertOk();
+
+        $this->assertNull($this->localization()->suggestion());
+    }
+
+    public function test_a_member_with_an_account_language_gets_no_suggestion(): void
+    {
+        $this->actingAs(User::create(['name' => 'member', 'locale' => 'en']))->withHeader('Accept-Language', 'fr')->get('/terms')->assertOk();
+        // The account alone: the request mirrored it into the pick, which would also hide the suggestion.
+        session()->forget(ResolveLocale::PICKED_KEY);
+
+        $this->assertNull($this->localization()->suggestion());
     }
 }

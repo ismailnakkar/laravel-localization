@@ -80,6 +80,6 @@ final class ConfigTest extends TestCase
     {
         $this->assertSame([], $this->localization()->languages());
         $this->assertNull($this->localization()->accountLanguage());
-        $this->assertNull($this->localization()->accountLanguageOffer());
+        $this->assertNull($this->localization()->suggestion());
     }
 }

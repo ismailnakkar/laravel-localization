@@ -202,18 +202,53 @@ final class ResolveLocaleTest extends LanguagesTestCase
 
         $this->get('/es/terms')->assertContent('es');
         $this->get('/plain')->assertContent('es');
-        $this->get('/terms')->assertContent('en');
+        $this->get('/terms', ['Sec-Fetch-Site' => 'same-origin'])->assertContent('en');
         $this->get('/plain')->assertContent('en');
     }
 
-    public function test_the_language_they_browse_beats_the_account(): void
+    /** @return iterable<string, array{string, array<string, string>, string}> URI, headers, the language they browse after */
+    public static function pageViews(): iterable
+    {
+        yield 'a prefixed copy' => ['/es/terms', [], 'es'];
+        yield "the default's prefix, typed" => ['/en/terms', ['Sec-Fetch-Site' => 'none', 'Sec-Fetch-Dest' => 'document'], 'en'];
+        yield 'the default copy, clicked inside the site' => ['/terms', ['Sec-Fetch-Site' => 'same-origin', 'Sec-Fetch-Dest' => 'document'], 'en'];
+        yield 'the default copy, clicked inside the site, by Referer' => ['/terms', ['Referer' => 'http://localhost/fr/terms'], 'en'];
+        yield 'the default copy, typed or bookmarked' => ['/terms', ['Sec-Fetch-Site' => 'none', 'Sec-Fetch-Dest' => 'document'], 'fr'];
+        yield 'the default copy, from another site' => ['/terms', ['Sec-Fetch-Site' => 'cross-site', 'Sec-Fetch-Dest' => 'document'], 'fr'];
+        yield 'the default copy, no Fetch Metadata nor Referer' => ['/terms', [], 'fr'];
+    }
+
+    /** @param array<string, string> $headers */
+    #[DataProvider('pageViews')]
+    public function test_a_default_copy_opened_from_outside_records_no_language(string $uri, array $headers, string $browsing): void
+    {
+        $this->withSession([ResolveLocale::SESSION_KEY => 'fr'])->withHeaders($headers)->get($uri);
+
+        $this->assertSame($browsing, session(ResolveLocale::SESSION_KEY));
+    }
+
+    public function test_the_account_beats_a_pick_the_language_they_browse_and_the_browser(): void
     {
         $user = User::create(['name' => 'member', 'locale' => 'ar']);
 
-        $this->actingAs($user)->withSession([ResolveLocale::SESSION_KEY => 'fr'])->get('/plain')->assertContent('fr');
+        $this->actingAs($user)->withSession([ResolveLocale::PICKED_KEY => 'es', ResolveLocale::SESSION_KEY => 'fr'])
+            ->withHeaders(['Accept-Language' => 'fr'])->get('/plain')->assertContent('ar');
 
         $this->assertSame('fr', session(ResolveLocale::SESSION_KEY));
         $this->assertSame('ar', $user->fresh()?->locale);
+    }
+
+    public function test_a_members_account_is_mirrored_into_the_pick_so_a_refusal_ahead_of_the_account_speaks_it(): void
+    {
+        $member = User::create(['name' => 'member', 'locale' => 'ar']);
+
+        $this->actingAs($member)->withSession([ResolveLocale::PICKED_KEY => 'es', ResolveLocale::SESSION_KEY => 'fr'])->get('/limited')->assertOk();
+        $this->app->setLocale('en');
+
+        $this->get('/limited')->assertStatus(429);
+
+        $this->assertSame('ar', $this->app->getLocale());
+        $this->assertSame('ar', session(ResolveLocale::PICKED_KEY));
     }
 
     public function test_a_laravel_seo_0_3_sessions_language_is_forgotten(): void
@@ -229,9 +264,12 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->actingAs($user)->get('/plain')->assertContent('fr');
     }
 
-    public function test_the_session_beats_the_browser(): void
+    public function test_a_pick_beats_the_language_they_browse_which_beats_the_browser(): void
     {
-        $this->withSession([ResolveLocale::SESSION_KEY => 'fr'])->withHeaders(['Accept-Language' => 'es'])->get('/plain')->assertContent('fr');
+        $this->withSession([ResolveLocale::PICKED_KEY => 'es', ResolveLocale::SESSION_KEY => 'fr'])->withHeaders(['Accept-Language' => 'ar'])->get('/plain')->assertContent('es');
+        session()->forget(ResolveLocale::PICKED_KEY);
+
+        $this->get('/plain')->assertContent('fr');
     }
 
     public function test_a_sessions_first_prefixed_page_sets_the_choice(): void
@@ -280,21 +318,19 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertSame('fr', $user->fresh()?->locale);
     }
 
-    public function test_a_copy_opened_becomes_every_pages_language_by_any_method_and_never_the_accounts(): void
+    public function test_a_copy_opened_by_any_method_is_what_they_browse_and_never_outranks_nor_writes_the_account(): void
     {
         $member = User::create(['name' => 'member', 'locale' => 'ar']);
 
-        $this->actingAs($member)->get('/members')->assertContent('ar');
-        $this->get('/fr')->assertContent('fr');
-        $this->get('/members')->assertContent('fr');
+        $this->actingAs($member)->get('/fr')->assertContent('fr');
         $this->post('/es')->assertContent('es');
-        $this->get('/members')->assertContent('es');
+        $this->get('/members')->assertContent('ar');
 
         $this->assertSame('es', session(ResolveLocale::SESSION_KEY));
         $this->assertSame('ar', $member->fresh()?->locale);
     }
 
-    public function test_a_copy_in_the_accounts_language_writes_nothing(): void
+    public function test_a_copy_in_the_accounts_language_never_writes_the_account(): void
     {
         $user = User::create(['name' => 'member', 'locale' => 'fr']);
         $user->mergeCasts(['locale' => LocaleCode::class]);
@@ -307,7 +343,7 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->get('/plain')->assertContent('fr');
 
         $this->assertSame([], $codes);
-        $this->assertNull(session(ResolveLocale::SESSION_KEY));
+        $this->assertSame('fr', session(ResolveLocale::SESSION_KEY));
     }
 
     public function test_a_click_inside_the_site_onto_the_default_copy_switches_to_the_default(): void
@@ -414,6 +450,17 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertSame('fr', $member->fresh()?->locale);
     }
 
+    /** A bare copy opened from outside shows the default: the account takes that, never the browser's guess. */
+    public function test_a_bare_copy_opened_from_outside_fills_an_empty_account_with_what_it_shows(): void
+    {
+        $member = User::create(['name' => 'member', 'locale' => null]);
+
+        $this->actingAs($member)->get('/terms', ['Sec-Fetch-Site' => 'none', 'Sec-Fetch-Dest' => 'document', 'Accept-Language' => 'fr'])
+            ->assertOk()->assertContent('en');
+
+        $this->assertSame('en', $member->fresh()?->locale);
+    }
+
     #[DefineEnvironment('sessionCheckRankedEarly')]
     public function test_a_forged_post_refused_by_csrf_ranked_after_the_account_saves_nothing(): void
     {
@@ -440,7 +487,7 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertSame('fr', User::query()->where('name', 'new')->value('locale'));
     }
 
-    public function test_signing_in_on_a_copy_keeps_the_account_and_the_members_area_follows_the_copy(): void
+    public function test_signing_in_on_a_copy_keeps_the_account_and_the_members_area_speaks_it(): void
     {
         $member = User::create(['name' => 'member', 'locale' => 'ar']);
 
@@ -448,7 +495,7 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->post('/fr/sign-in')->assertContent('fr');
 
         $this->assertSame('ar', $member->fresh()?->locale);
-        $this->get('/members')->assertOk()->assertContent('fr');
+        $this->get('/members')->assertOk()->assertContent('ar');
     }
 
     /** @return iterable<string, array{string, string}> the browser's language, the login page's prefix */
@@ -479,7 +526,7 @@ final class ResolveLocaleTest extends LanguagesTestCase
     }
 
     #[DataProvider('signInsOpeningNoCopy')]
-    public function test_signing_in_without_opening_a_copy_keeps_what_they_browse(string $uri, ?string $before, string $after): void
+    public function test_signing_in_without_opening_a_copy_keeps_the_account_else_fills_it_with_what_they_browse(string $uri, ?string $before, string $after): void
     {
         $member = User::create(['name' => 'member', 'locale' => $before]);
         $codes = [];
@@ -489,7 +536,7 @@ final class ResolveLocaleTest extends LanguagesTestCase
         });
 
         $this->withSession([ResolveLocale::SESSION_KEY => 'es'])->post($uri)->assertOk();
-        $this->get('/plain')->assertContent('es');
+        $this->get('/plain')->assertContent($after);
 
         $this->assertSame($before === $after ? [] : [$after], $codes);
         $this->assertSame($after, $member->fresh()?->locale);
@@ -643,53 +690,76 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertSame('fr', Carbon::getLocale());
     }
 
-    public function test_an_arrival_from_outside_goes_to_its_languages_copy_with_the_query_untouched(): void
+    public function test_an_arrival_from_outside_goes_to_the_picked_languages_copy_with_the_query_untouched(): void
     {
-        $this->withHeaders(['Accept-Language' => 'fr'])->get('/?utm_source=x&b=2&a=1')
+        $this->withSession([ResolveLocale::PICKED_KEY => 'fr'])->get('/?utm_source=x&b=2&a=1')
             ->assertStatus(302)
             ->assertHeader('Location', 'http://localhost/fr?utm_source=x&b=2&a=1');
 
-        $this->flushSession();
-        $this->withHeaders(['Accept-Language' => 'fr'])->head('/')->assertStatus(302);
+        $this->head('/')->assertStatus(302);
     }
 
-    public function test_a_member_typing_the_domain_lands_on_the_language_they_browse_else_their_accounts(): void
+    public function test_a_browser_language_alone_never_redirects_nor_is_recorded(): void
+    {
+        $this->withHeaders(['Accept-Language' => 'fr', 'Sec-Fetch-Site' => 'none', 'Sec-Fetch-Dest' => 'document'])->get('/')->assertOk()->assertContent('en');
+
+        $this->assertNull(session(ResolveLocale::SESSION_KEY));
+        $this->assertNull(session(ResolveLocale::PICKED_KEY));
+    }
+
+    public function test_a_member_typing_the_domain_lands_on_their_accounts_language_over_a_pick_and_what_they_browse(): void
     {
         $member = User::create(['name' => 'member', 'locale' => 'ar']);
 
-        $this->actingAs($member)->withSession([ResolveLocale::SESSION_KEY => 'es'])->get('/')->assertRedirect('/es');
-        $this->flushSession();
-        $this->get('/')->assertRedirect('/ar');
+        $this->actingAs($member)->withSession([ResolveLocale::PICKED_KEY => 'es', ResolveLocale::SESSION_KEY => 'fr'])->get('/')->assertRedirect('/ar');
 
-        $this->assertNull(session(ResolveLocale::SESSION_KEY));
+        $this->assertSame('fr', session(ResolveLocale::SESSION_KEY));
         $this->assertSame('ar', $member->fresh()?->locale);
     }
 
-    public function test_the_redirect_is_opt_in_per_route(): void
+    public function test_a_bookmark_to_a_default_copy_never_switches_a_member_off_their_accounts_language(): void
     {
-        config(['localization.entry_redirect' => ['terms']]);
+        $member = User::create(['name' => 'member', 'locale' => 'fr']);
 
-        $this->withHeaders(['Accept-Language' => 'fr'])->get('/terms')->assertRedirect('/fr/terms');
-        $this->get('/')->assertOk()->assertContent('en');
+        $this->actingAs($member)->withHeaders(['Sec-Fetch-Site' => 'none', 'Sec-Fetch-Dest' => 'document'])->get('/terms')->assertRedirect('/fr/terms');
+
+        $this->assertNull(session(ResolveLocale::SESSION_KEY));
+        $this->get('/plain')->assertContent('fr');
     }
 
-    /** @return iterable<string, array{string, string, array<string, string>}> method, URI, headers */
+    public function test_a_guest_who_picked_a_language_is_sent_to_its_copy_of_any_page_from_a_bookmark(): void
+    {
+        $this->post('/locale', ['locale' => 'fr', 'to' => '/'])->assertRedirect('/fr');
+
+        $this->withHeaders(['Sec-Fetch-Site' => 'none', 'Sec-Fetch-Dest' => 'document'])->get('/terms')->assertRedirect('/fr/terms');
+    }
+
+    public function test_the_redirect_covers_every_localized_page_whatever_entry_redirect_lists(): void
+    {
+        config(['localization.entry_redirect' => []]);
+
+        $this->withSession([ResolveLocale::PICKED_KEY => 'fr'])->get('/terms')->assertRedirect('/fr/terms');
+        $this->get('/')->assertRedirect('/fr');
+    }
+
+    /** @return iterable<string, array{string, string, array<string, string>, string}> method, URI, headers, the language picked */
     public static function staysPut(): iterable
     {
-        yield 'a route not listed' => ['GET', '/terms', ['Accept-Language' => 'fr']];
-        yield 'a POST' => ['POST', '/', ['Accept-Language' => 'fr']];
-        yield 'a QUERY, which Symfony 7.4+ counts as cacheable' => ['QUERY', '/', ['Accept-Language' => 'fr']];
-        yield 'a signed URL' => ['GET', '/?signature=x', ['Accept-Language' => 'fr']];
-        yield 'a click inside the site' => ['GET', '/', ['Accept-Language' => 'fr', 'Sec-Fetch-Site' => 'same-origin']];
-        yield 'a click inside the site, by Referer' => ['GET', '/', ['Accept-Language' => 'fr', 'Referer' => 'http://localhost/fr/terms']];
-        yield 'Googlebot sending a language' => ['GET', '/', ['Accept-Language' => 'fr', 'User-Agent' => 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)']];
-        yield 'the default language' => ['GET', '/', ['Accept-Language' => 'en']];
+        yield 'a POST' => ['POST', '/', [], 'fr'];
+        yield 'a QUERY, which Symfony 7.4+ counts as cacheable' => ['QUERY', '/', [], 'fr'];
+        yield 'a signed URL' => ['GET', '/?signature=x', [], 'fr'];
+        yield 'a click inside the site' => ['GET', '/', ['Sec-Fetch-Site' => 'same-origin'], 'fr'];
+        yield 'a click inside the site, by Referer' => ['GET', '/', ['Referer' => 'http://localhost/fr/terms'], 'fr'];
+        yield 'Googlebot' => ['GET', '/', ['User-Agent' => 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'], 'fr'];
+        yield 'the default language picked' => ['GET', '/', [], 'en'];
     }
 
     /** @param array<string, string> $headers */
     #[DataProvider('staysPut')]
-    public function test_it_stays_put(string $method, string $uri, array $headers): void
+    public function test_it_stays_put(string $method, string $uri, array $headers, string $picked): void
     {
+        $this->withSession([ResolveLocale::PICKED_KEY => $picked]);
+
         // call() ignores withHeaders().
         $this->call($method, $uri, server: $this->transformHeadersToServerVars($headers))->assertOk()->assertContent('en');
     }
@@ -707,17 +777,19 @@ final class ResolveLocaleTest extends LanguagesTestCase
     #[DataProvider('arrivals')]
     public function test_an_arrival_is_redirected(array $headers): void
     {
-        $this->withHeaders(['Accept-Language' => 'fr', ...$headers])->get('/')->assertRedirect('/fr');
+        $this->withSession([ResolveLocale::PICKED_KEY => 'fr'])->withHeaders($headers)->get('/')->assertRedirect('/fr');
     }
 
     public function test_typing_the_defaults_prefix_opens_the_default_copy_and_the_entry_redirect_leaves_it(): void
     {
         $arrival = ['Accept-Language' => 'fr', 'Sec-Fetch-Site' => 'none', 'Sec-Fetch-Dest' => 'document'];
 
-        $this->withHeaders($arrival)->get('/en')->assertStatus(301)->assertHeader('Location', 'http://localhost')
-            ->assertHeader('Cache-Control', 'no-cache, private');
+        // A pick is known and redirects a bare copy; /en asked for this one by name, for its landing only.
+        $this->withSession([ResolveLocale::PICKED_KEY => 'fr'])->withHeaders($arrival)->get('/en')->assertStatus(301)
+            ->assertHeader('Location', 'http://localhost')->assertHeader('Cache-Control', 'no-cache, private');
         $this->assertSame('en', session(ResolveLocale::SESSION_KEY));
         $this->withHeaders($arrival)->get('/')->assertOk()->assertContent('en');
+        $this->withHeaders($arrival)->get('/')->assertRedirect('/fr');
 
         $this->flushSession();
         $this->withHeaders(['Sec-Fetch-Site' => 'cross-site', 'Sec-Fetch-Dest' => 'image'])->get('/en/terms')->assertStatus(301);
@@ -726,7 +798,7 @@ final class ResolveLocaleTest extends LanguagesTestCase
 
     public function test_a_prefixed_copy_is_never_redirected(): void
     {
-        $this->withSession([ResolveLocale::SESSION_KEY => 'ar'])->get('/es')->assertOk()->assertContent('es');
+        $this->withSession([ResolveLocale::PICKED_KEY => 'ar'])->get('/es')->assertOk()->assertContent('es');
     }
 
     protected function withoutRememberingTheLocale(FoundationApplication $app): void
@@ -749,7 +821,7 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertSame('http://localhost/es/terms', route('terms'));
         $this->assertEquals([new Language('en', false), new Language('fr', false), new Language('ar', false), new Language('es', true)], $this->localization()->languages());
         $this->assertNull($this->localization()->accountLanguage());
-        $this->assertNull($this->localization()->accountLanguageOffer());
+        $this->assertNull($this->localization()->suggestion());
         $this->assertNull(session(ResolveLocale::SESSION_KEY));
         $this->assertSame('ar', $member->fresh()?->locale);
     }

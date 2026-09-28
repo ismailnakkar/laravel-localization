@@ -13,33 +13,28 @@ final class CheckCommandTest extends TestCase
     public function test_the_language_config_is_checked_where_boot_cannot(): void
     {
         config([
-            'localization.entry_redirect' => ['home', 'nope'],
+            'localization.locales'        => ['en', 'fr'],
+            'localization.entry_redirect' => ['home'],
             'localization.user_locale'    => 'locale',
             'auth.providers.users.model'  => User::class,
         ]);
-        $this->withLocalizedRoutes(['en', 'fr'], static fn () => Route::get('/', static fn () => 'home')->name('home'));
         $this->createUsersTable();
 
         [$code, $output] = $this->check();
 
         $this->assertSame(<<<'TXT'
             languages
-              entry_redirect . PASS home
-              entry_redirect . FAIL [nope] is not the name of a Route::localized() route
+              entry_redirect . WARN ignored since 0.2, remove it: every localized page now redirects to a known language
               user_locale .... PASS users.locale
 
 
             TXT, $output);
-        $this->assertSame(1, $code);
+        $this->assertSame(0, $code);
 
         config(['localization.user_locale' => 'missing']);
-        [, $output] = $this->check();
+        [$code, $output] = $this->check();
 
         $this->assertStringContainsString('  user_locale .... FAIL users has no column [missing]', $output);
-
-        config(['localization.entry_redirect' => ['home']]);
-        [$code] = $this->check();
-
         $this->assertSame(1, $code);
 
         config(['localization.user_locale' => 'locale']);
@@ -48,21 +43,21 @@ final class CheckCommandTest extends TestCase
         $this->assertSame(0, $code);
     }
 
-    public function test_account_and_redirect_settings_warn_while_the_locale_is_not_remembered(): void
+    public function test_the_account_column_warns_while_the_locale_is_not_remembered(): void
     {
         config([
+            'localization.locales'         => ['en', 'fr'],
             'localization.remember_locale' => false,
             'localization.entry_redirect'  => ['home'],
             'localization.user_locale'     => 'locale',
             'auth.providers.users.model'   => User::class,
         ]);
-        $this->withLocalizedRoutes(['en', 'fr'], static fn () => Route::get('/', static fn () => 'home')->name('home'));
 
         [$code, $output] = $this->check();
 
         $this->assertStringContainsString(<<<'TXT'
             languages
-              entry_redirect . WARN ignored while remember_locale is false
+              entry_redirect . WARN ignored since 0.2, remove it: every localized page now redirects to a known language
               user_locale .... WARN ignored while remember_locale is false
 
             TXT, $output);

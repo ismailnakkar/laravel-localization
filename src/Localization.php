@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Localization;
 
 use Closure;
+use Localization\Http\ApplyLocale;
+use Localization\Http\ResolveLocale;
 
 /** Not final: apps mock it. */
 class Localization
@@ -45,14 +47,28 @@ class Localization
         return UserLocale::of(auth()->guard()->user(), $locales);
     }
 
-    /** The on-screen language to offer when accountLanguage() is set and differs; else null. */
-    public function accountLanguageOffer(): ?Language
+    /**
+     * The browser's language, to offer a visitor who told us none (no account language, no answer yet) while the
+     * page is in another; else null. Offer it in its own language, posting it or the page's to localization.switch.
+     */
+    public function suggestion(): ?Language
     {
-        $current = app()->getLocale();
-        $account = $this->accountLanguage();
+        $locales = Locales::configured();
+        $request = request();
 
-        return $account === null || $account === $current || ! in_array($current, Locales::configured()->codes ?? [], true)
-            ? null
-            : new Language($current, true);
+        if (
+            $locales === null
+            || config('localization.remember_locale') === false
+            || ! $request->hasSession()
+            || $this->accountLanguage() !== null
+            || ResolveLocale::stored($request, ResolveLocale::PICKED_KEY, $locales) !== null
+            || ApplyLocale::isCrawler($request)
+        ) {
+            return null;
+        }
+
+        $browser = $locales->preferredBy($request);
+
+        return $browser === null || $browser === app()->getLocale() ? null : new Language($browser, false);
     }
 }

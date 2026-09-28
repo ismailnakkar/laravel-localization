@@ -11,7 +11,4 @@ return [
 
     // User attribute holding their language; null: session only.
     'user_locale' => null,
-
-    // Route names whose default copy sends outside arrivals to their language's copy.
-    'entry_redirect' => [],
 ];

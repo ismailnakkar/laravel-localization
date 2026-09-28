@@ -8,10 +8,8 @@ use Illuminate\Console\Command;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
-use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Schema;
 use Localization\Locales;
-use Localization\LocalizedRoute;
 use Localization\UserLocale;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -24,7 +22,7 @@ final class CheckCommand extends Command
 
     protected $description = 'Check the language configuration a booted app can only check at runtime.';
 
-    private const array LEFTOVER_KEYS = ['seo.locales', 'seo.user_locale', 'seo.entry_redirect'];
+    private const array LEFTOVER_KEYS = ['seo.locales', 'seo.user_locale'];
 
     private bool $failed;
 
@@ -38,9 +36,9 @@ final class CheckCommand extends Command
             $leftover[] = 'seo.remember_locale';
         }
         $off = $config->get('localization.remember_locale') === false;
-        $names = (array)$config->get('localization.entry_redirect');
+        $stale = filled($config->get('localization.entry_redirect'));
         $column = UserLocale::column();
-        $languages = Locales::configured() !== null && ($names !== [] || $column !== null);
+        $languages = Locales::configured() !== null && ($stale || $column !== null);
 
         if ($leftover === [] && ! $languages) {
             return self::SUCCESS;
@@ -53,7 +51,7 @@ final class CheckCommand extends Command
         }
 
         if ($languages) {
-            $this->languages($config, $off, $names, $column);
+            $this->languages($config, $off, $stale, $column);
         }
 
         $this->write();
@@ -61,20 +59,10 @@ final class CheckCommand extends Command
         return $this->failed ? self::FAILURE : self::SUCCESS;
     }
 
-    /** @param  array<mixed>  $names */
-    private function languages(Repository $config, bool $off, array $names, ?string $column): void
+    private function languages(Repository $config, bool $off, bool $stale, ?string $column): void
     {
-        $routes = $this->laravel->make(Router::class)->getRoutes();
-
-        if ($off && $names !== []) {
-            $this->row('entry_redirect', 'WARN', 'ignored while remember_locale is false');
-        }
-
-        foreach ($off ? [] : $names as $name) {
-            $name = is_scalar($name) ? (string)$name : get_debug_type($name);
-            $localized = LocalizedRoute::of($routes->getByName($name));
-            $isDefaultCopy = $localized !== null && $localized->locale === $localized->locales->default;
-            $this->row('entry_redirect', $isDefaultCopy ? 'PASS' : 'FAIL', $isDefaultCopy ? $name : "[{$name}] is not the name of a Route::localized() route");
+        if ($stale) {
+            $this->row('entry_redirect', 'WARN', 'ignored since 0.2, remove it: every localized page now redirects to a known language');
         }
 
         if ($column !== null) {

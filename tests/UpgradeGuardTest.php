@@ -15,7 +15,7 @@ final class UpgradeGuardTest extends TestCase
         config(['seo.locales' => ['en', 'fr'], 'localization.locales' => []]);
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionMessage("Route::localized(): move 'locales', 'remember_locale', 'user_locale' and 'entry_redirect' from config/seo.php to config/localization.php.");
+        $this->expectExceptionMessage("Route::localized(): move 'locales', 'remember_locale' and 'user_locale' from config/seo.php to config/localization.php.");
 
         Route::localized(static fn () => Route::get('terms', static fn () => 'terms'));
     }
@@ -26,7 +26,7 @@ final class UpgradeGuardTest extends TestCase
 
         $this->assertSame(1, Artisan::call('localization:check'));
         $this->assertSame(
-            "languages\n  leftover keys .. FAIL seo.locales, seo.user_locale, seo.entry_redirect: move them to config/localization.php, laravel-seo ignores them\n\n",
+            "languages\n  leftover keys .. FAIL seo.locales, seo.user_locale: move them to config/localization.php, laravel-seo ignores them\n\n",
             Artisan::output(),
         );
 

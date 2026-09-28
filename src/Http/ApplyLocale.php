@@ -14,6 +14,9 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class ApplyLocale
 {
+    /** Flashed by the /en/… hop: the bare copy it lands on was asked for by name, so no entry redirect undoes it. */
+    private const string DEFAULT_ASKED = 'localization.default_asked';
+
     public function handle(Request $request, Closure $next): Response
     {
         $locales = Locales::configured();
@@ -25,27 +28,37 @@ final class ApplyLocale
         $localized = LocalizedRoute::of($request->route());
         $user = $request->user();
         $account = UserLocale::of($user, $locales);
-        $choice = ResolveLocale::choice($request, $locales, $account);
-        $target = $this->entryTarget($request, $locales, $localized, $choice);
+        // Known: the account or an answer. Never the browser, which is only a guess: that one is offered, not forced.
+        $known = $account ?? ResolveLocale::stored($request, ResolveLocale::PICKED_KEY, $locales);
+        $target = $this->entryTarget($request, $locales, $localized, $known);
 
-        // Redirect before saving, or arriving on the default copy would save the default over the choice.
         if ($target !== null) {
             return redirect()->to($target);
         }
 
+        $choice = ResolveLocale::choice($request, $locales, $account);
         $pageView = self::opensThePage($request);
-        // Typing /en/… asks for the default; the entry redirect must not undo it.
-        $redirect = $request->route()?->getAction(RedirectToDefaultCopy::ACTION);
-        $opened = $pageView ? ($localized->locale ?? (is_string($redirect) ? $redirect : null)) : null;
+        $opened = $pageView ? self::opened($request, $locales, $localized) : null;
 
-        // Only a change, so a login copy picked from Accept-Language never outranks the account.
-        if ($opened !== null && $opened !== $choice && $request->hasSession()) {
-            $request->session()->put(ResolveLocale::SESSION_KEY, $opened);
+        if ($request->hasSession()) {
+            if ($opened !== null) {
+                $request->session()->put(ResolveLocale::SESSION_KEY, $opened);
+            }
+
+            if ($opened !== null && is_string($request->route()?->getAction(RedirectToDefaultCopy::ACTION))) {
+                $request->session()->flash(self::DEFAULT_ASKED, true);
+            }
+
+            // So ResolveLocale, which never reads the user, speaks the account's language too.
+            if ($account !== null && ResolveLocale::stored($request, ResolveLocale::PICKED_KEY, $locales) !== $account) {
+                $request->session()->put(ResolveLocale::PICKED_KEY, $account);
+            }
         }
 
         // Page view only (a sibling's fetch can set Accept-Language); GET only (POST /locale saves the choice).
         if ($pageView && $request->isMethod('GET') && $account === null && UserLocale::hasColumn($user)) {
-            rescue(static fn () => UserLocale::save($user, $opened ?? $choice, unlessSet: $locales));
+            // What the URL named, else what the page shows: a bare copy opened from outside shows the default.
+            rescue(static fn () => UserLocale::save($user, $opened ?? $localized->locale ?? $choice, unlessSet: $locales));
         }
 
         app()->setLocale($localized->locale ?? $choice);
@@ -53,17 +66,17 @@ final class ApplyLocale
         return $next($request);
     }
 
-    private function entryTarget(Request $request, Locales $locales, ?LocalizedRoute $localized, string $choice): ?string
+    /** A bare default copy names no language: from outside, it opens in the one the visitor told us, if any. */
+    private function entryTarget(Request $request, Locales $locales, ?LocalizedRoute $localized, ?string $known): ?string
     {
-        $name = $request->route()?->getName();
-
         if (
-            $localized === null
+            $known === null
+            || $known === $locales->default
+            || $localized === null
             || $localized->locale !== $locales->default
-            || $choice === $locales->default
-            || ! in_array($name, (array)config('localization.entry_redirect'), true)
             || ! ($request->isMethod('GET') || $request->isMethod('HEAD'))
             || $request->query->has('signature') // a signed URL pins its path
+            || ($request->hasSession() && $request->session()->get(self::DEFAULT_ASKED) === true)
             || self::fromInsideTheSite($request)
             || self::isCrawler($request)
         ) {
@@ -72,7 +85,24 @@ final class ApplyLocale
 
         $query = (string)$request->server->get('QUERY_STRING');
 
-        return $localized->path($request->getPathInfo(), $choice) . ($query === '' ? '' : "?{$query}");
+        return $localized->path($request->getPathInfo(), $known) . ($query === '' ? '' : "?{$query}");
+    }
+
+    /**
+     * The language a page view names: a prefixed copy's, or the default's typed as /en/…. A bare default copy names
+     * none from outside (a bookmark, an old link), only when clicked inside the site, where route() built it.
+     */
+    private static function opened(Request $request, Locales $locales, ?LocalizedRoute $localized): ?string
+    {
+        $redirect = $request->route()?->getAction(RedirectToDefaultCopy::ACTION);
+
+        if (is_string($redirect)) {
+            return $redirect;
+        }
+
+        return $localized !== null && ($localized->locale !== $locales->default || self::fromInsideTheSite($request))
+            ? $localized->locale
+            : null;
     }
 
     /**
@@ -104,8 +134,8 @@ final class ApplyLocale
         return is_string($referer) && strcasecmp($referer, $request->getHost()) === 0;
     }
 
-    /** Octane: pass this request's server values; the default constructor reads a stale $_SERVER. */
-    private static function isCrawler(Request $request): bool
+    /** @internal Octane: pass this request's server values; the default constructor reads a stale $_SERVER. */
+    public static function isCrawler(Request $request): bool
     {
         $userAgent = (string)$request->userAgent();
 

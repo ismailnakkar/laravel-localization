@@ -6,6 +6,7 @@ namespace Localization\Tests;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
+use Localization\Http\ResolveLocale;
 use Seo\Page;
 use Seo\Testing\SeoAssertions;
 
@@ -27,7 +28,7 @@ final class LanguagesCrawlTest extends LanguagesTestCase
         $this->fixturePage = static fn (Request $request): Page => new Page(title: str_ends_with($request->getPathInfo(), 'faq') ? 'FAQ' : 'Home');
         $this->withSitemap(['/', '/faq']);
 
-        $this->withHeaders(['Accept-Language' => 'fr'])->get('/')->assertStatus(302)->assertHeader('Location', 'http://localhost/fr');
+        $this->withSession([ResolveLocale::PICKED_KEY => 'fr'])->get('/')->assertStatus(302)->assertHeader('Location', 'http://localhost/fr');
 
         $this->assertHreflangReciprocal('/');
         $this->assertHreflangReciprocal('/fr');

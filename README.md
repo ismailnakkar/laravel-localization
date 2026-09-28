@@ -35,14 +35,16 @@ Render `<html lang="{{ app()->getLocale() }}">`, add [the switcher](#language) a
 
 ## Language
 
-- A localized page renders its URL's language. Other pages in `web` use the session's, else the account's, else
-  `Accept-Language`, else the default.
-- Visiting another language's copy (page load, Inertia, `wire:navigate`, link from another site) switches the session.
-  Signed links and Livewire updates don't, nor (in browsers sending Fetch Metadata) `<img>` and iframes.
-  Prefetch counts: exclude links to other languages from it (e.g. `data-turbo-prefetch="false"`).
-- `entry_redirect` (e.g. `['home']`) lists pages whose default copy 302s visitors arriving from outside the site
-  (another site, a bookmark, a typed URL) to their language's copy. Crawlers, signed links and internal clicks are
-  exempt. Don't let a CDN cache these pages' HTML.
+- A localized page renders its URL's language. Other pages in `web` use the account's, else the one picked (switcher
+  or [suggestion](#account-language)), else the last copy opened, else `Accept-Language`, else the default.
+- Opening a copy (page load, Inertia, `wire:navigate`, link from another site) makes it the last one opened; the bare
+  default copy counts only when reached from inside the site. Signed links and Livewire updates don't, nor (in browsers
+  sending Fetch Metadata) `<img>` and iframes. Prefetch counts: exclude links to other languages from it (e.g.
+  `data-turbo-prefetch="false"`).
+- Arriving from outside the site (another site, a bookmark, a typed URL) on a localized page's default copy 302s to the
+  account's language, else the picked one; never to `Accept-Language`'s, which is only suggested. Typing `/en/…`
+  opens the default copy regardless. Crawlers, signed links and internal clicks are exempt. Don't let a CDN cache
+  localized pages' HTML.
 - On Laravel 13, a POST catch-all inside `Route::domain()` shadows the switcher's `POST /locale`.
 
 The switcher saves the language to the session (and, with `user_locale`, the account) and returns to the same page in
@@ -63,29 +65,25 @@ that language. A signed page is re-signed only if its route is named and its sig
 
 ## Account language
 
-Set `user_locale` to your users' language column. The switcher saves it, and an account without one gets the visitor's
-once (a value outside `locales` counts as none and is overwritten); models without the column are skipped. Implement
-`HasLocalePreference` returning that column so mail uses it. To offer syncing a session and account that differ,
-render this in your layout (not error views):
+Set `user_locale` to your users' language column. A member's account language outranks the session, and the switcher
+saves it; an account without one gets the language on screen once (a value outside `locales` counts as none and is overwritten);
+models without the column are skipped. Implement `HasLocalePreference` returning that column so mail uses it.
+
+A visitor who told us no language (no account language, nothing picked) and whose browser prefers another gets a
+suggestion. Render this in your layout (not error views); either answer is a pick, so it isn't asked again:
 
 ```blade
 @inject('localization', \Localization\Localization::class)
-@if ($offer = $localization->accountLanguageOffer())
-    <dialog id="account-language">
+@if ($suggestion = $localization->suggestion())
+    <aside lang="{{ $suggestion->code }}">
         <form method="POST" action="{{ route('localization.switch') }}">
             @csrf
             <input type="hidden" name="to" value="{{ request()->getRequestUri() }}">
-            <p>{{ __('Use this language for your account too?') }}</p>
-            <button name="locale" value="{{ $localization->accountLanguage() }}" class="keep">{{ __('No, keep mine') }}</button>
-            <button name="locale" value="{{ $offer->code }}">{{ __('Yes') }}</button>
+            <p>{{ __('Show this site in :language?', ['language' => __("languages.{$suggestion->code}", locale: $suggestion->code)], $suggestion->code) }}</p>
+            <button name="locale" value="{{ $suggestion->code }}">{{ __('Yes', locale: $suggestion->code) }}</button>
+            <button name="locale" value="{{ app()->getLocale() }}">{{ __('No, thanks', locale: $suggestion->code) }}</button>
         </form>
-    </dialog>
-    <script type="module">
-        const dialog = document.getElementById('account-language');
-        // Escape closes it without a button, and Chrome may skip the cancel event: it counts as keeping.
-        dialog.addEventListener('close', () => dialog.querySelector('form').requestSubmit(dialog.querySelector('.keep')));
-        dialog.showModal();
-    </script>
+    </aside>
 @endif
 ```
 
@@ -109,9 +107,9 @@ as it reads the user) join `web`. `ApplyLocale` must run after your session chec
 - Livewire: add `\Localization\Http\ResolveLocale::class` and `\Localization\Http\ApplyLocale::class` to
   `Livewire::addPersistentMiddleware()`.
 
-With `'remember_locale' => false`, only a copy's URL sets the language (no session, account, switcher or entry
-redirect); `route()`, `languages()` and laravel-seo still work. Pick `$code` in your own middleware (with Livewire, add
-it to `Livewire::addPersistentMiddleware()`) and call
+With `'remember_locale' => false`, only a copy's URL sets the language (no session, account, switcher, entry redirect
+or suggestion); `route()`, `languages()` and laravel-seo still work. Pick `$code` in your own middleware (with Livewire,
+add it to `Livewire::addPersistentMiddleware()`) and call
 `app()->setLocale(\Localization\LocalizedRoute::of($request->route())->locale ?? $code)`. To redirect old `?lang=fr`
 URLs, check `$code` is one of your locales, then redirect to
 `LocalizedRoute::of($request->route())?->path($request->getPathInfo(), $code)`.
@@ -123,14 +121,13 @@ URLs, check `$code` is one of your locales, then redirect to
 | `locales` | `[]` | Language codes, default first. Fewer than two turns everything off. |
 | `remember_locale` | `true` | `false`: only a copy's URL sets the language. |
 | `user_locale` | `null` | The users table's language column. `null`: session only. |
-| `entry_redirect` | `[]` | Route names whose default copy redirects arrivals from outside to their language. |
 
 Codes are ISO 639-1 plus an optional script and region, cased exactly (`en`, `en-GB`, `zh-Hant`). `es-419` and `fil`
 are refused, as Google ignores them in hreflang: use `es`, `tl`. A code is also the URL segment and app locale, so name
 translation folders after it (`lang/pt-BR/`, not `pt_BR`).
 
 `localization:check` exits 1 on any FAIL. Its rows: `leftover keys` (no laravel-seo 0.4 language keys left in
-`config/seo.php`), `entry_redirect` (every name is a `Route::localized()` route), `user_locale` (the default guard's
-users table has the column; WARN when it can't check).
+`config/seo.php`), `entry_redirect` (WARN while this 0.1 key is still set), `user_locale` (the default guard's users
+table has the column; WARN when it can't check).
 
 [MIT licensed](LICENSE).

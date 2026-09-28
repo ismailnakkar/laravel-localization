@@ -30,6 +30,7 @@ final class SwitchLocale
         $code = (string)$request->validate(['locale' => ['required', 'string', Rule::in($locales->codes)]])['locale'];
 
         if ($request->hasSession()) {
+            $request->session()->put(ResolveLocale::PICKED_KEY, $code);
             $request->session()->put(ResolveLocale::SESSION_KEY, $code);
         }
 
