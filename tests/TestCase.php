@@ -26,7 +26,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 abstract class TestCase extends BaseTestCase
 {
-    /** The index host; unlisted hosts (go.test) crawl, dl.test is noindex. */
     protected const string URL = 'http://localhost';
 
     protected const array PAGES = ['/', '/faq', '/payment-proof', '/reset-password'];
@@ -36,7 +35,7 @@ abstract class TestCase extends BaseTestCase
 
     protected function setUp(): void
     {
-        // Laravel 12 keeps this static state between tests; each app must start from what its providers set at boot.
+        // Laravel 12 keeps this static across tests.
         PreventRequestsDuringMaintenance::flushState();
 
         parent::setUp();
@@ -57,10 +56,7 @@ abstract class TestCase extends BaseTestCase
         $app['config']->set('database.default', 'testing');
     }
 
-    /**
-     * For #[DefineEnvironment]: the laravel-seo closure registers only if languages are set at boot.
-     * It reads the codes from each route, so withLocales() may still change them.
-     */
+    /** For #[DefineEnvironment]: laravel-seo's closure registers only if languages are set at boot. */
     protected function withLanguagesAtBoot(Application $app): void
     {
         $app['config']->set('localization.locales', ['en', 'fr']);
@@ -73,7 +69,7 @@ abstract class TestCase extends BaseTestCase
         }
     }
 
-    /** Relative URLs hit the index host, not whichever host the previous request left url() on. */
+    /** Relative URLs hit the index host, not the previous request's. */
     protected function prepareUrlForRequest($uri)
     {
         return is_string($uri) && str_starts_with($uri, '/') ? self::URL . $uri : parent::prepareUrlForRequest($uri);
@@ -136,11 +132,7 @@ abstract class TestCase extends BaseTestCase
         return array_column(iterator_to_array($this->seo()->sitemap(), false), 'loc');
     }
 
-    /**
-     * Localizes the fixture pages, replacing their unlocalized routes on the same URIs.
-     *
-     * @param  list<string>  $codes  the first is the default
-     */
+    /** @param  list<string>  $codes  the first is the default */
     protected function withLocales(array $codes = ['en', 'fr', 'ar', 'es']): void
     {
         $this->withLocalizedRoutes($codes, self::defineWebRoutes(...));

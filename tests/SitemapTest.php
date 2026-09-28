@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Route;
 use Orchestra\Testbench\Attributes\DefineEnvironment;
 use Seo\SitemapEntry;
 
-/** laravel-seo's sitemap expansion on real Route::localized() routes, through the seam. */
 #[DefineEnvironment('withLanguagesAtBoot')]
 final class SitemapTest extends TestCase
 {

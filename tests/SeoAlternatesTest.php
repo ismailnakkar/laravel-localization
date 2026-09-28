@@ -13,7 +13,6 @@ use Seo\Seo;
 
 final class SeoAlternatesTest extends TestCase
 {
-    /** For #[DefineEnvironment]: resolves Seo before the providers boot, as an earlier provider's boot() might. */
     protected function resolvingSeoFirst(Application $app): void
     {
         $app->make(Seo::class);
@@ -34,7 +33,7 @@ final class SeoAlternatesTest extends TestCase
 
     public function test_below_two_locales_at_boot_nothing_is_registered(): void
     {
-        // Localized after boot, so a registered closure would still expand /fr/faq.
+        // Localized after boot: a registered closure would still expand /fr/faq.
         $this->withSite();
         $this->withLocales(['en', 'fr']);
         $this->withSitemap(['/fr/faq']);

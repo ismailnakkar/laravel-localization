@@ -12,7 +12,6 @@ use Seo\ParsedPage;
 use Seo\Robots;
 use Seo\Testing\SeoAssertions;
 
-/** laravel-seo's canonical and hreflang on real Route::localized() routes, through the seam. */
 #[DefineEnvironment('withLanguagesAtBoot')]
 final class HreflangTest extends TestCase
 {
@@ -50,7 +49,7 @@ final class HreflangTest extends TestCase
 
     public function test_an_encoded_locale_prefix_emits_its_plain_spellings_set_and_canonical(): void
     {
-        // The router matches the rawurldecoded path, so these reach the fr copy.
+        // The router matches the rawurldecoded path.
         $this->withSite();
         $this->withLocales();
 
@@ -88,7 +87,7 @@ final class HreflangTest extends TestCase
             $this->assertSame("http://localhost{$url}", $this->canonicalOf($url, $page), $url);
         }
 
-        // Stripping the fr prefix leaves `//evil.test/x`, which a browser reads as a host.
+        // Stripping fr leaves `//evil.test/x`: a host to a browser.
         $this->assertSame([
             'en'        => 'http://localhost/evil.test/x',
             'fr'        => 'http://localhost/fr//evil.test/x',
@@ -129,7 +128,6 @@ final class HreflangTest extends TestCase
 
     public function test_script_and_region_codes_are_path_segments_and_hreflang_values(): void
     {
-        // Google documents script subtags (zh-Hans, zh-Hant), optionally with a region.
         $this->withSite();
         $this->withLocales(['en-GB', 'zh-Hant', 'zh-Hant-TW']);
 

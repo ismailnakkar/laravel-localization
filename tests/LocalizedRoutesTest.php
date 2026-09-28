@@ -29,19 +29,18 @@ final class LocalizedRoutesTest extends TestCase
 
     public function test_the_default_keeps_its_uris_and_names_and_every_other_code_gets_a_prefixed_copy(): void
     {
-        // Else the fixture's '/' keeps its early slot when the default copy overwrites it.
+        // Else the default '/' copy inherits the fixture '/' route's early slot.
         Route::setRoutes(new RouteCollection);
         $locales = new Locales(['en', 'fr', 'zh-Hant'], 'en');
         $this->withLocalizedRoutes($locales->codes, static function (): void {
             Route::get('/', static fn () => 'home')->name('home');
-            // A prefix group inside the closure is fine: it merges the marker in unchanged.
             Route::name('pages.')->prefix('legal')->middleware('throttle:60,1')->group(static function (): void {
                 Route::get('terms', static fn () => 'terms')->name('terms');
             });
             Route::get('unnamed', static fn () => 'unnamed');
         });
 
-        // Unnamed copies take the group's bare name; the default registers last so it never shadows a prefixed copy.
+        // The default registers last so it never shadows a prefixed copy.
         $this->assertSame([
             'fr'                  => 'localization.fr.home',
             'fr/legal/terms'      => 'localization.fr.pages.terms',
@@ -165,12 +164,10 @@ final class LocalizedRoutesTest extends TestCase
             $this->get($url)->assertOk()->assertContent($content);
         }
 
-        // /en is the default's prefix, never a {page}; the fallback gets no redirect.
         $this->get('/en')->assertStatus(301)->assertHeader('Location', 'http://localhost');
         $this->get('/en/about')->assertStatus(301)->assertHeader('Location', 'http://localhost/about');
         $this->get('/en/a/b/c')->assertOk()->assertContent('fallback:en');
 
-        // The sitemap matches a loc the same way.
         $this->withSitemap(['/fr']);
         $this->assertSame(['http://localhost/', 'http://localhost/fr'], $this->locs());
     }
@@ -193,7 +190,6 @@ final class LocalizedRoutesTest extends TestCase
             $this->get($url)->assertStatus(301)->assertHeader('Location', $location);
         }
 
-        // Only a GET page redirects, within its constraints.
         $this->get('/en/posts/x')->assertNotFound();
         $this->get('/en/nope')->assertNotFound();
         $this->post('/en/contact')->assertNotFound();
@@ -294,7 +290,6 @@ final class LocalizedRoutesTest extends TestCase
         $this->assertSame('http://localhost/terms', url('/terms'));
         $this->assertSame('http://localhost/terms', URL::to('terms'));
 
-        // A locale the route lacks gets the default's URL.
         $this->app->setLocale('de');
         $this->assertSame('http://localhost/terms', route('localization.ar.terms'));
         $this->assertSame('http://localhost', route('localization.fr.home'));
@@ -323,7 +318,7 @@ final class LocalizedRoutesTest extends TestCase
             '/unnamed'    => [null, false, false],
             '/fr/unnamed' => [null, false, false],
         ] as $url => $answer) {
-            // Twice: the uncached collection hands back the same Route, already renamed.
+            // Twice: the same Route comes back, already renamed.
             $this->get($url)->assertOk()->assertExactJson($answer);
             $this->get($url)->assertOk()->assertExactJson($answer);
         }
@@ -350,7 +345,7 @@ final class LocalizedRoutesTest extends TestCase
 
     public function test_action_urls_follow_the_current_locale_whichever_copy_the_lookup_keeps(): void
     {
-        // The action lookup keeps the last copy (the default) on Laravel 12, the first on 13.
+        // The action lookup keeps the default copy on Laravel 12, the first on 13.
         $this->withLocalizedRoutes(['en', 'fr', 'ar'], static function (): void {
             Route::get('terms', [LocalizedController::class, 'terms'])->name('terms');
         });
@@ -412,7 +407,6 @@ final class LocalizedRoutesTest extends TestCase
         $this->get('/fr/about')->assertOk()->assertContent('site.about');
         $this->get('/en/terms?a=1')->assertStatus(301)->assertHeader('Location', 'http://localhost/terms?a=1');
 
-        // route:cache names unnamed routes generated::…; the copy reports that name without localization.ar.
         foreach (['/one', '/ar/one'] as $path) {
             $this->assertStringStartsWith('generated::', (string)$this->get($path)->assertOk()->getContent());
         }
@@ -426,7 +420,7 @@ final class LocalizedRoutesTest extends TestCase
                 'is'      => true,
                 'routeIs' => true,
             ];
-            // Twice: the compiled collection keeps the Route it built per name, already renamed.
+            // Twice: the compiled collection reuses its Route, already renamed.
             $this->get($path)->assertOk()->assertExactJson($json);
             $this->get($path)->assertOk()->assertExactJson($json);
         }

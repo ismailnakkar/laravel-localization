@@ -115,7 +115,7 @@ final class UserLocaleTest extends TestCase
     {
         $this->createAdminsTable();
         Admin::create();
-        // Loaded fresh, as a guard would: strict mode skips models created in this request.
+        // Reloaded: strict mode skips models created in this request.
         $admin = Admin::query()->firstOrFail();
         $this->localization()->saveUserLocaleUsing(static fn () => throw new LogicException('never called'));
         Model::preventAccessingMissingAttributes();

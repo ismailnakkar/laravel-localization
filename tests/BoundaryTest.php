@@ -9,10 +9,7 @@ use Symfony\Component\Finder\Finder;
 
 final class BoundaryTest extends TestCase
 {
-    /**
-     * laravel-seo is optional, so only SeoAlternates may name it, even in class_exists(), a string or a docblock.
-     * `Localization\Seo…` does not count.
-     */
+    /** laravel-seo is optional: only SeoAlternates may name it, even in a string or docblock. */
     public function test_only_seo_alternates_names_laravel_seo(): void
     {
         $root = dirname(__DIR__);

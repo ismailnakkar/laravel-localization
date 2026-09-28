@@ -12,7 +12,6 @@ use Localization\LocalizedRoute;
 use Localization\UserLocale;
 use Symfony\Component\HttpFoundation\Response;
 
-/** Adds the account's language and the entry redirect, after AuthenticateSession has checked the session. */
 final class ApplyLocale
 {
     public function handle(Request $request, Closure $next): Response
@@ -29,23 +28,22 @@ final class ApplyLocale
         $choice = ResolveLocale::choice($request, $locales, $account);
         $target = $this->entryTarget($request, $locales, $localized, $choice);
 
-        // Redirect before saving, or an arrival on the default copy would save the default over the choice.
+        // Redirect before saving, or arriving on the default copy would save the default over the choice.
         if ($target !== null) {
             return redirect()->to($target);
         }
 
         $pageView = self::opensThePage($request);
-        // Typing the default's prefix (/en/…) asks for the default, so the entry redirect must not undo it.
+        // Typing /en/… asks for the default; the entry redirect must not undo it.
         $redirect = $request->route()?->getAction(RedirectToDefaultCopy::ACTION);
         $opened = $pageView ? ($localized->locale ?? (is_string($redirect) ? $redirect : null)) : null;
 
-        // Only a change, so the login copy `auth` picked from the browser's language never outranks the account.
+        // Only a change, so a login copy picked from Accept-Language never outranks the account.
         if ($opened !== null && $opened !== $choice && $request->hasSession()) {
             $request->session()->put(ResolveLocale::SESSION_KEY, $opened);
         }
 
-        // Only a page view, since a sibling's fetch can set Accept-Language, and only a GET, since POST /locale saves
-        // the choice itself.
+        // Page view only (a sibling's fetch can set Accept-Language); GET only (POST /locale saves the choice).
         if ($pageView && $request->isMethod('GET') && $account === null && UserLocale::hasColumn($user)) {
             rescue(static fn () => UserLocale::save($user, $opened ?? $choice, unlessSet: $locales));
         }
@@ -55,7 +53,6 @@ final class ApplyLocale
         return $next($request);
     }
 
-    /** The choice's copy of an entry_redirect page, for a visitor arriving from outside the site; null to render. */
     private function entryTarget(Request $request, Locales $locales, ?LocalizedRoute $localized, string $choice): ?string
     {
         $name = $request->route()?->getName();
@@ -79,10 +76,9 @@ final class ApplyLocale
     }
 
     /**
-     * Cross-origin, only a top-level GET: cookies follow an <img>, iframe or forged POST, and CSRF may run later.
-     * Same origin or no Fetch Metadata (old browser): a page load or the app's own fetch (Inertia, wire:navigate),
-     * never a user-content <img>/iframe. Never a signed link (its sender chose the language), or a Livewire update
-     * replaying one unsigned.
+     * Cross-origin: top-level GET only; cookies ride an <img>, iframe or forged POST, and CSRF may run later.
+     * Same-origin or no Fetch Metadata: a page load or the app's fetch (Inertia, wire:navigate), not an <img>/iframe.
+     * Never a signed link (its sender chose the language) or a Livewire update replaying one unsigned.
      */
     private static function opensThePage(Request $request): bool
     {
@@ -94,7 +90,7 @@ final class ApplyLocale
             : $request->isMethod('GET') && $dest === 'document');
     }
 
-    /** Sec-Fetch-Site, or where a browser sends none (Safari before 16.4, plain HTTP), a Referer on this host. */
+    /** Referer fallback: Safari before 16.4 and plain HTTP send no Sec-Fetch-Site. */
     private static function fromInsideTheSite(Request $request): bool
     {
         $site = $request->headers->get('Sec-Fetch-Site');
@@ -108,7 +104,7 @@ final class ApplyLocale
         return is_string($referer) && strcasecmp($referer, $request->getHost()) === 0;
     }
 
-    /** Built from this request's own server values: the default constructor reads $_SERVER, stale under Octane. */
+    /** Octane: pass this request's server values; the default constructor reads a stale $_SERVER. */
     private static function isCrawler(Request $request): bool
     {
         $userAgent = (string)$request->userAgent();

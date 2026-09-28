@@ -9,7 +9,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-/** Deliberately wrong: it overrides the URL's locale. */
+/** Deliberately wrong: overrides the URL's locale. */
 final class NegotiateLocale
 {
     public function __construct(private readonly Application $app) {}

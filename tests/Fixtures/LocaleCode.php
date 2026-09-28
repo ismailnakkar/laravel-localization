@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Localization\Tests\Fixtures;
 
-/** An app's enum cast on the users' locale column. */
 enum LocaleCode: string
 {
     case en = 'en';

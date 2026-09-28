@@ -50,7 +50,7 @@ final class ResolveLocaleTest extends LanguagesTestCase
     protected function defineWebRoutes($router): void
     {
         $locale = static fn (): string => app()->getLocale();
-        // Login-as swaps in the member after ApplyLocale ran; in the action since middleware can't be a Closure.
+        // Login-as: swaps users after ApplyLocale ran.
         $loginAs = static function (Request $request) use ($locale): string {
             Auth::onceUsingId((int)$request->route('member'));
 
@@ -62,7 +62,7 @@ final class ResolveLocaleTest extends LanguagesTestCase
             return $locale();
         };
 
-        // CSRF reads the session too, so it goes as well: VerifyCsrfToken on Laravel 12, PreventRequestForgery on 13.
+        // CSRF reads the session: VerifyCsrfToken on Laravel 12, PreventRequestForgery on 13.
         $sessionless = [StartSession::class, ShareErrorsFromSession::class, VerifyCsrfToken::class, PreventRequestForgery::class];
 
         $router->localized(static function (Router $router) use ($locale, $loginAs, $signIn, $sessionless): void {
@@ -95,15 +95,11 @@ final class ResolveLocaleTest extends LanguagesTestCase
 
         $this->assertContains(ResolveLocale::class, $kernel->getMiddlewareGroups()['web']);
         $this->assertContains(ApplyLocale::class, $kernel->getMiddlewareGroups()['web']);
-        // (int): getMiddlewarePriority() returns a bare array, so Larastan types array_search() as int|string|false.
         $this->assertSame((int)array_search(StartSession::class, $priority, true) + 1, array_search(ResolveLocale::class, $priority, true));
         $this->assertSame((int)array_search(AuthenticatesSessions::class, $priority, true) + 1, array_search(ApplyLocale::class, $priority, true));
     }
 
-    /**
-     * An app's withMiddleware() ranking its session check subclass after `auth`, then ApplyLocale (per the README),
-     * and its gates before the throttles. The builder's hook runs before any package's.
-     */
+    /** An app's withMiddleware(), ranked per the README. */
     protected function sessionCheckRankedEarly(FoundationApplication $app): void
     {
         new ApplicationBuilder($app)->withMiddleware(static function (Middleware $middleware): void {
@@ -127,16 +123,14 @@ final class ResolveLocaleTest extends LanguagesTestCase
 
         $this->assertARevokedSessionWritesNothing();
 
-        // A browser in es: only ApplyLocale, reading the account, can make it fr.
         $member = User::create(['name' => 'member', 'locale' => 'fr', 'password' => 'hash-now']);
         $this->actingAs($member)->withHeaders(['Accept-Language' => 'es'])->get('/recent')->assertStatus(423)->assertContent('fr');
     }
 
-    /** An app's own priority list without AuthenticateSession, set before any package's hook as the builder's is. */
     protected function priorityWithoutAuthenticateSession(Application $app): void
     {
         $app->afterResolving(Kernel::class, static function (HttpKernel $kernel): void {
-            // Not StartSession first: older Laravel ranks "after the first entry" at the end of the list.
+            // Not StartSession first: older Laravel ranks "after the first entry" last.
             $kernel->setMiddlewarePriority([EncryptCookies::class, StartSession::class, AuthenticatesRequests::class, SubstituteBindings::class]);
             $kernel->appendMiddlewareToGroup('web', AuthenticateSession::class);
         });
@@ -165,7 +159,7 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->withAuthenticateSession();
         $member = User::create(['name' => 'member', 'locale' => 'fr', 'password' => 'hash-now', 'remember_token' => 'token']);
 
-        // Issued under an old password: newer guards refuse it, older ones leave it to AuthenticateSession.
+        // Old password: newer guards refuse it, older ones leave it to AuthenticateSession.
         $this->withCookie($this->recallerName(), "{$member->id}|token|hash-before")->get('/');
 
         $this->assertGuestNextTime();
@@ -189,7 +183,7 @@ final class ResolveLocaleTest extends LanguagesTestCase
     public function test_the_choice_never_signs_in_a_remember_me_cookie_for_a_refusal_ahead_of_authenticate_session(): void
     {
         $member = User::create(['name' => 'member', 'locale' => 'fr', 'password' => 'hash-now', 'remember_token' => 'token']);
-        // Unit tests skip CSRF. offsetSet(), not `$this->app['env'] =`, which Larastan misreads.
+        // Unit tests skip CSRF.
         $this->app->offsetSet('env', 'production');
 
         $this->withCookie($this->recallerName(), "{$member->id}|token|hash-now")->post('/')->assertStatus(419);
@@ -224,7 +218,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
 
     public function test_a_laravel_seo_0_3_sessions_language_is_forgotten(): void
     {
-        // laravel-seo 0.3 wrote the browser's guess there on every request: it would outrank the account.
         $this->withSession(['seo.locale' => 'fr'])->withHeaders(['Accept-Language' => 'es'])->get('/plain')->assertContent('es');
     }
 
@@ -261,7 +254,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
     {
         $this->withHeaders(['Accept-Language' => 'es', ...$headers])->get($uri)->assertContent('fr');
 
-        // Not /fr/login, where signing in would give the account the copy's language.
         $this->get('/members')->assertRedirect('/es/login');
     }
 
@@ -280,7 +272,7 @@ final class ResolveLocaleTest extends LanguagesTestCase
 
     public function test_an_account_without_a_language_takes_the_copys(): void
     {
-        // `locale` => null: a guard's user carries every column, and only a loaded, empty one is filled.
+        // Explicit null: only a loaded, empty column is filled.
         $user = User::create(['name' => 'member', 'locale' => null]);
 
         $this->actingAs($user)->withSession([ResolveLocale::SESSION_KEY => 'es'])->get('/fr/terms')->assertContent('fr');
@@ -343,7 +335,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $member = User::create(['name' => 'member', 'locale' => 'fr']);
         $url = URL::signedRoute('terms');
 
-        // From webmail: whoever sent the mail chose the link's language, not the member.
         $this->actingAs($member)->withHeaders(['Sec-Fetch-Site' => 'cross-site', 'Sec-Fetch-Dest' => 'document'])->get($url)->assertOk()->assertContent('en');
 
         $this->assertNull(session(ResolveLocale::SESSION_KEY));
@@ -386,7 +377,7 @@ final class ResolveLocaleTest extends LanguagesTestCase
     {
         $member = User::create(['name' => 'member', 'locale' => null]);
 
-        // An <img>: a SameSite=None session cookie follows it from any site.
+        // SameSite=None cookies follow a cross-site <img>.
         $this->actingAs($member)->withSession([ResolveLocale::SESSION_KEY => 'es'])
             ->withHeaders(['Sec-Fetch-Site' => 'cross-site', 'Sec-Fetch-Dest' => 'image'])->get('/ar')->assertOk()->assertContent('ar');
 
@@ -414,7 +405,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $member = User::create(['name' => 'member', 'locale' => null]);
         $this->actingAs($member);
 
-        // A sibling subdomain's fetch can set Accept-Language; an <img> or a Livewire update is no page view.
         $this->get('/plain', ['Sec-Fetch-Site' => 'same-site', 'Sec-Fetch-Dest' => 'empty', 'Accept-Language' => 'ar'])->assertContent('ar');
         $this->get('/plain', ['Sec-Fetch-Site' => 'same-origin', 'Sec-Fetch-Dest' => 'image', 'Accept-Language' => 'ar'])->assertContent('ar');
         $this->get('/plain', ['X-Livewire' => 'true', 'Accept-Language' => 'ar'])->assertContent('ar');
@@ -443,7 +433,7 @@ final class ResolveLocaleTest extends LanguagesTestCase
     public function test_a_new_account_takes_the_language_of_its_first_page(): void
     {
         $this->withSession([ResolveLocale::SESSION_KEY => 'es'])->withHeaders(['Accept-Language' => 'fr'])->post('/fr/sign-up')->assertContent('fr');
-        // Reload the user as a real next request would: the instance sign-up created lacks the column.
+        // Reload the user: the instance sign-up created lacks the column.
         Auth::forgetGuards();
         $this->get('/plain')->assertContent('fr');
 
@@ -473,7 +463,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
     {
         $member = User::create(['name' => 'member', 'locale' => 'ar']);
 
-        // No session yet: `auth` sends the guest to the login page in the browser's language, not one they chose.
         $this->withHeaders(['Accept-Language' => $browser])->get('/members')->assertRedirect("{$prefix}/login");
         $this->post("{$prefix}/sign-in")->assertOk();
 
@@ -593,7 +582,7 @@ final class ResolveLocaleTest extends LanguagesTestCase
         }
 
         $this->actingAs(Admin::create(), 'admin');
-        // actingAs() made the admin guard the default; on the page, auth:admin must.
+        // actingAs() made admin the default guard; only auth:admin may.
         Auth::shouldUse('web');
         Model::preventAccessingMissingAttributes($strict);
         DB::enableQueryLog();
@@ -639,7 +628,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
     public function test_a_route_without_a_session_still_resolves(): void
     {
         $this->withHeaders(['Accept-Language' => 'es'])->get('/sessionless')->assertOk()->assertContent('es');
-        // Opened in a language other than the choice, with no session to record it in.
         $this->withHeaders(['Accept-Language' => 'es'])->get('/fr/sessionless-copy')->assertOk()->assertContent('fr');
     }
 
@@ -662,7 +650,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
             ->assertHeader('Location', 'http://localhost/fr?utm_source=x&b=2&a=1');
 
         $this->flushSession();
-        // head(), not call('HEAD', ...): only the per-verb wrappers apply withHeaders().
         $this->withHeaders(['Accept-Language' => 'fr'])->head('/')->assertStatus(302);
     }
 
@@ -703,7 +690,7 @@ final class ResolveLocaleTest extends LanguagesTestCase
     #[DataProvider('staysPut')]
     public function test_it_stays_put(string $method, string $uri, array $headers): void
     {
-        // call() ignores withHeaders(), so the headers go in as server vars.
+        // call() ignores withHeaders().
         $this->call($method, $uri, server: $this->transformHeadersToServerVars($headers))->assertOk()->assertContent('en');
     }
 
@@ -732,7 +719,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertSame('en', session(ResolveLocale::SESSION_KEY));
         $this->withHeaders($arrival)->get('/')->assertOk()->assertContent('en');
 
-        // Embedded by another site, it records nothing.
         $this->flushSession();
         $this->withHeaders(['Sec-Fetch-Site' => 'cross-site', 'Sec-Fetch-Dest' => 'image'])->get('/en/terms')->assertStatus(301);
         $this->assertNull(session(ResolveLocale::SESSION_KEY));
@@ -768,10 +754,9 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertSame('ar', $member->fresh()?->locale);
     }
 
-    /** Revoked by logoutOtherDevices(), the session's hash is stale: only AuthenticateSession catches it. */
     private function assertARevokedSessionWritesNothing(): void
     {
-        // An empty account, which a request signed in when ApplyLocale runs would fill.
+        // Explicit null, else ApplyLocale has nothing to fill.
         $member = User::create(['name' => 'member', 'password' => 'hash-now', 'locale' => null]);
 
         $this->actingAs($member)->withSession(['password_hash_web' => 'stale', ResolveLocale::SESSION_KEY => 'es'])->get('/plain');
@@ -793,7 +778,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
         return $guard->getRecallerName();
     }
 
-    /** The next visit, without the cookie: only what the last one left in the session can sign it in. */
     private function assertGuestNextTime(): void
     {
         $this->defaultCookies = [];

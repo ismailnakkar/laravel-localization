@@ -9,7 +9,6 @@ use Illuminate\Routing\Router;
 use Seo\Page;
 use Seo\Testing\SeoAssertions;
 
-/** laravel-seo's crawler assertions on localized pages, with the language middleware and entry redirect running. */
 final class LanguagesCrawlTest extends LanguagesTestCase
 {
     use SeoAssertions;

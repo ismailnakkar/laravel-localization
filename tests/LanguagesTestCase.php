@@ -7,14 +7,13 @@ namespace Localization\Tests;
 use Carbon\Laravel\ServiceProvider as CarbonServiceProvider;
 use Localization\Tests\Fixtures\User;
 
-/** Four languages, the fixture User as accounts, and no Accept-Language unless a test sends one. */
 abstract class LanguagesTestCase extends TestCase
 {
     protected const string BROWSER = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15';
 
     protected function getPackageProviders($app): array
     {
-        // Testbench skips package discovery, and Carbon follows the app locale only through its own provider.
+        // Testbench skips discovery; Carbon follows the app locale only via its provider.
         return [CarbonServiceProvider::class, ...parent::getPackageProviders($app)];
     }
 
@@ -33,7 +32,7 @@ abstract class LanguagesTestCase extends TestCase
         parent::setUp();
 
         $this->createUsersTable();
-        // Symfony's test requests otherwise send `Accept-Language: en-us,en;q=0.5` and `User-Agent: Symfony`.
+        // Else Symfony sends `Accept-Language: en-us,en;q=0.5` and `User-Agent: Symfony`.
         $this->withHeaders(['User-Agent' => self::BROWSER, 'Accept-Language' => '']);
     }
 }

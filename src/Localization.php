@@ -6,26 +6,19 @@ namespace Localization;
 
 use Closure;
 
-/** The package's language API. Not final so apps can mock it. */
+/** Not final: apps mock it. */
 class Localization
 {
     /** @internal */
     public private(set) ?Closure $userLocaleSaver = null;
 
-    /**
-     * Makes $save(User $user, string $code) write the language instead of Eloquent; reads still use the user_locale
-     * attribute. It gets whichever guard's user is signed in, if its row has that column; the user is synced after.
-     */
+    /** Writes the language via $save(User $user, string $code) instead of Eloquent; reads still use user_locale. */
     public function saveUserLocaleUsing(Closure $save): void
     {
         $this->userLocaleSaver = $save;
     }
 
-    /**
-     * The configured languages in config order; [] when fewer than two are configured.
-     *
-     * @return list<Language>
-     */
+    /** @return list<Language> In config order; [] when fewer than two are configured. */
     public function languages(): array
     {
         $locales = Locales::configured();
@@ -39,9 +32,7 @@ class Localization
         return array_map(static fn (string $code): Language => new Language($code, $code === $current), $locales->codes);
     }
 
-    /**
-     * The signed-in user's saved language; null for a guest, if unset or not in `locales`, or remember_locale off.
-     */
+    /** The signed-in user's saved language; null for a guest, a code outside `locales`, or remember_locale off. */
     public function accountLanguage(): ?string
     {
         $locales = Locales::configured();
@@ -50,14 +41,11 @@ class Localization
             return null;
         }
 
-        // The guard, not request(): a request bound before the auth provider registered has no user resolver.
+        // Not request(): one bound before the auth provider registered has no user resolver.
         return UserLocale::of(auth()->guard()->user(), $locales);
     }
 
-    /**
-     * The language on screen when accountLanguage() differs, for a "use it for your account too?" prompt; else null
-     * (an account without one is filled in). Answers post this code or accountLanguage() to localization.switch.
-     */
+    /** The on-screen language to offer when accountLanguage() is set and differs; else null. */
     public function accountLanguageOffer(): ?Language
     {
         $current = app()->getLocale();

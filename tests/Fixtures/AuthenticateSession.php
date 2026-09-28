@@ -6,5 +6,5 @@ namespace Localization\Tests\Fixtures;
 
 use Illuminate\Session\Middleware\AuthenticateSession as LaravelAuthenticateSession;
 
-/** An app's own AuthenticateSession subclass, as in App\Http\Middleware. */
+/** Stands in for App\Http\Middleware\AuthenticateSession. */
 final class AuthenticateSession extends LaravelAuthenticateSession {}

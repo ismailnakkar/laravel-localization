@@ -16,7 +16,7 @@ use Localization\UserLocale;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Output\OutputInterface;
 
-/** @internal The localization:check command is the API. */
+/** @internal */
 #[AsCommand(name: 'localization:check')]
 final class CheckCommand extends Command
 {
@@ -24,7 +24,6 @@ final class CheckCommand extends Command
 
     protected $description = 'Check the language configuration a booted app can only check at runtime.';
 
-    /** laravel-seo 0.4's language keys, which 0.5 ignores. */
     private const array LEFTOVER_KEYS = ['seo.locales', 'seo.user_locale', 'seo.entry_redirect'];
 
     private bool $failed;
@@ -34,7 +33,7 @@ final class CheckCommand extends Command
         $this->failed = false;
         $leftover = array_values(array_filter(self::LEFTOVER_KEYS, static fn (string $key): bool => filled($config->get($key))));
 
-        // Only false: a leftover true is the old default, but an ignored false silently turns remembering back on.
+        // Only false: true was the old default; an ignored false silently re-enables remembering.
         if ($config->get('seo.remember_locale') === false) {
             $leftover[] = 'seo.remember_locale';
         }
@@ -62,11 +61,7 @@ final class CheckCommand extends Command
         return $this->failed ? self::FAILURE : self::SUCCESS;
     }
 
-    /**
-     * Routes load after every provider's boot, even with route:cache, so only a booted app can check these.
-     *
-     * @param  array<mixed>  $names
-     */
+    /** @param  array<mixed>  $names */
     private function languages(Repository $config, bool $off, array $names, ?string $column): void
     {
         $routes = $this->laravel->make(Router::class)->getRoutes();
@@ -115,7 +110,7 @@ final class CheckCommand extends Command
         $this->write('  ' . str_pad("{$check} ", 16, '.') . " {$status} {$detail}");
     }
 
-    /** Raw, so a configured name like `<fg=red>` prints as written, not as a style tag. */
+    /** Raw, so a configured name like `<fg=red>` isn't read as a style tag. */
     private function write(string $line = ''): void
     {
         $this->output->writeln($line, OutputInterface::OUTPUT_RAW);

@@ -8,7 +8,6 @@ use Orchestra\Testbench\Attributes\DefineEnvironment;
 use Seo\Page;
 use Seo\Robots;
 
-/** laravel-seo's head on real Route::localized() routes, through the seam. */
 #[DefineEnvironment('withLanguagesAtBoot')]
 final class HeadTest extends TestCase
 {

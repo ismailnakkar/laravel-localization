@@ -6,10 +6,10 @@ parameters:
     paths:
         - src
         - tests
-    # Constructors re-check config values against the types their PHPDoc promises.
+    # Constructors re-check config values despite their PHPDoc types.
     treatPhpDocTypesAsCertain: false
     ignoreErrors:
-        # TestCase adds tests/Fixtures/views at runtime; Larastan checks view names against the bare skeleton.
+        # Fixture views are added at runtime; Larastan can't see them.
         -
             identifier: argument.type
             message: '#view-string#'

@@ -18,7 +18,6 @@ use PHPUnit\Framework\Attributes\DataProvider;
 
 final class SwitchLocaleTest extends LanguagesTestCase
 {
-    /** The README's account-language prompt, verbatim. */
     private const string MODAL = <<<'BLADE'
         @inject('localization', \Localization\Localization::class)
         @if ($offer = $localization->accountLanguageOffer())
@@ -67,7 +66,7 @@ final class SwitchLocaleTest extends LanguagesTestCase
 
     public function test_it_needs_the_csrf_token(): void
     {
-        // Unit tests skip CSRF. offsetSet(), not `$this->app['env'] =`, which Larastan misreads.
+        // Unit tests skip CSRF; offsetSet() as Larastan misreads `$this->app['env'] =`.
         $this->app->offsetSet('env', 'production');
 
         $this->post('/locale', ['locale' => 'fr', 'to' => '/terms'])->assertStatus(419);
@@ -96,7 +95,7 @@ final class SwitchLocaleTest extends LanguagesTestCase
     public function test_a_cached_route_refuses_once_the_locale_is_not_remembered(): void
     {
         $user = User::create(['name' => 'member', 'locale' => 'en']);
-        // The route is registered at boot; a route:cache built while remember_locale was on keeps it after that.
+        // Set after boot: a route:cache built with remember_locale on keeps the route.
         config(['localization.remember_locale' => false]);
 
         $this->actingAs($user)->post('/locale', ['locale' => 'fr', 'to' => '/plain'])->assertNotFound();
@@ -266,7 +265,6 @@ final class SwitchLocaleTest extends LanguagesTestCase
         $this->get('/ar/prefs/5')->assertForbidden();
     }
 
-    /** 'prefs' has no domain, so only the host comparison keeps it from signing for other.test. */
     public function test_a_forced_root_url_never_signs_for_that_host(): void
     {
         $to = self::pathAndQuery(URL::signedRoute('prefs', ['user' => 5]));
@@ -278,7 +276,7 @@ final class SwitchLocaleTest extends LanguagesTestCase
         $this->assertSame($to, self::pathAndQuery($location));
     }
 
-    /** Stripping localization.en. from the default copy's own name would sign the unrelated `admin` route. */
+    /** The `admin` route is bait: stripping localization.en. from this name would sign it. */
     public function test_a_default_copy_name_that_looks_prefixed_never_signs_an_unrelated_route(): void
     {
         $locale = static fn (): string => app()->getLocale();
@@ -310,7 +308,7 @@ final class SwitchLocaleTest extends LanguagesTestCase
 
     public function test_a_route_holding_the_name_with_other_parameters_leaves_the_page_unchanged(): void
     {
-        // Registered first so it holds the name; lookups keep the first route per name.
+        // First: name lookups keep the first route.
         Route::get('elsewhere/{slug}', static fn () => 'plain')->name('renamed');
         Route::localized(static fn () => Route::get('renamed/{user}', static fn (): string => app()->getLocale())->middleware('signed')->name('renamed'));
         Route::getRoutes()->refreshNameLookups();
@@ -321,7 +319,6 @@ final class SwitchLocaleTest extends LanguagesTestCase
         $this->post('/locale', ['locale' => 'ar', 'to' => $to])->assertStatus(303)->assertHeader('Location', "http://localhost{$to}");
     }
 
-    /** ->defaults() values merge into Route::parameters(), but the signed URL never carried them. */
     public function test_a_route_default_is_excluded_from_the_re_signed_query(): void
     {
         $locale = static fn (): string => app()->getLocale();
@@ -338,7 +335,6 @@ final class SwitchLocaleTest extends LanguagesTestCase
         $this->get($location)->assertOk();
     }
 
-    /** A previous key validates a GET (rotation grace) but never renews a signature past it. */
     public function test_a_url_signed_under_a_retired_key_is_never_renewed(): void
     {
         $locale = static fn (): string => app()->getLocale();
@@ -358,7 +354,6 @@ final class SwitchLocaleTest extends LanguagesTestCase
         $this->post('/locale', ['locale' => 'ar', 'to' => $to])->assertStatus(303)->assertHeader('Location', "http://localhost{$to}");
     }
 
-    /** Signing borrows the app locale; the request keeps its own. */
     public function test_the_apps_locale_is_restored_after_a_re_sign(): void
     {
         $locale = static fn (): string => app()->getLocale();
@@ -368,12 +363,12 @@ final class SwitchLocaleTest extends LanguagesTestCase
 
         $to = self::pathAndQuery(URL::signedRoute('lockedloc', ['user' => 5]));
 
-        // A saved choice makes ResolveLocale set 'es' before the controller re-signs.
+        // So the locale to restore is 'es', not the default.
         $this->withSession([ResolveLocale::SESSION_KEY => 'es']);
 
         $location = (string)$this->post('/locale', ['locale' => 'ar', 'to' => $to])->assertStatus(303)->headers->get('Location');
 
-        // Proves the re-sign ran; after an early return the locale check would pass vacuously.
+        // Proves the re-sign ran, else the locale check is vacuous.
         $this->assertStringStartsWith('http://localhost/ar/lockedloc/5?', $location);
         $this->assertSame('es', $this->app->getLocale());
     }
@@ -382,7 +377,7 @@ final class SwitchLocaleTest extends LanguagesTestCase
     {
         $locale = static fn (): string => app()->getLocale();
 
-        // admin.test first, because Laravel 12 gives a shared name to the first route, 13 to a domain route.
+        // admin.test first: Laravel 12 gives a shared name to the first route, 13 to a domain route.
         Route::domain('admin.test')->get('ar/dup/{user}', static fn () => 'ADMIN')->middleware('signed')->name('dup');
         Route::localized(static fn () => Route::get('dup/{user}', $locale)->middleware('signed')->name('dup'));
         Route::getRoutes()->refreshNameLookups();
@@ -401,7 +396,7 @@ final class SwitchLocaleTest extends LanguagesTestCase
         Route::localized(static fn () => Route::get('dup/{user}', static fn (): string => app()->getLocale())->middleware('signed')->name('dup'));
         Route::getRoutes()->refreshNameLookups();
 
-        // Signed by hand, since the name now resolves to admin.test's localization.fr.dup.
+        // By hand: the name now resolves to admin.test's copy.
         $to = '/fr/dup/5?signature=' . hash_hmac('sha256', 'http://localhost/fr/dup/5', (string)config('app.key'));
         $this->get($to)->assertOk();
 
@@ -442,7 +437,7 @@ final class SwitchLocaleTest extends LanguagesTestCase
 
     public function test_a_route_cache_generated_name_is_never_signed_again(): void
     {
-        // A second unnamed copy gets localization.fr.generated::… from route:cache, which strips to no route at all.
+        // A second unnamed copy, which route:cache names localization.fr.generated::….
         Route::localized(static fn () => Route::get('prefs-unnamed-too/{user}', static fn (): string => app()->getLocale())->middleware('signed'));
         $router = $this->app->make(Router::class);
         $routes = $router->getRoutes();
@@ -491,12 +486,10 @@ final class SwitchLocaleTest extends LanguagesTestCase
             ->assertSee('<button name="locale" value="ar" class="keep">No, keep mine</button>', false)
             ->assertSee('<button name="locale" value="fr">Yes</button>', false);
 
-        // No: the page goes back to the account's language.
         $this->post('/locale', ['locale' => 'ar', 'to' => '/fr/terms'])->assertRedirect('/ar/terms');
         $this->get('/modal')->assertOk()->assertDontSee('<dialog', false);
         $this->assertSame('ar', $member->fresh()?->locale);
 
-        // Yes: the account takes the page's.
         $this->get('/fr/terms');
         $this->post('/locale', ['locale' => 'fr', 'to' => '/modal'])->assertRedirect('/modal');
         $this->get('/modal')->assertOk()->assertDontSee('<dialog', false);

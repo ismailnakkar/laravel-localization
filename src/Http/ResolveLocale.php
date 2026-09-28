@@ -10,7 +10,7 @@ use Localization\Locales;
 use Localization\LocalizedRoute;
 use Symfony\Component\HttpFoundation\Response;
 
-/** Never reads the user, since that would sign in a remember-me cookie before AuthenticateSession checks it. */
+/** Never read the user: it would sign in a remember-me cookie before AuthenticateSession checks it. */
 final class ResolveLocale
 {
     public const string SESSION_KEY = 'localization.browsing';

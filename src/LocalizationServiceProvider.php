@@ -21,27 +21,26 @@ use Localization\Http\RedirectToDefaultCopy;
 use Localization\Http\ResolveLocale;
 use LogicException;
 
-/** @internal Registered by package auto-discovery. */
+/** @internal */
 class LocalizationServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/localization.php', 'localization');
 
-        // Octane-safe singleton: it holds a closure, never resolved values.
+        // Singleton, not scoped: Octane must keep the boot-time closure; never store resolved values.
         $this->app->singleton(Localization::class);
 
-        // A matched listener, not middleware: it sets the locale before route middleware, also outside `web` or with
-        // remember_locale off. In register() so listeners other providers add in boot() (error trackers) see it too.
+        // Before any route middleware, outside `web` too. In register() so boot()-time listeners see the locale.
         $this->app->make(Router::class)->matched(static function (RouteMatched $event): void {
             if (($localized = LocalizedRoute::of($event->route)) === null) {
                 return;
             }
 
-            app()->setLocale($localized->locale); // app() is the request's sandbox under Octane
+            app()->setLocale($localized->locale); // Octane: the request's sandbox.
 
             if ($localized->locale !== $localized->locales->default) {
-                // Named localization.{code}.name, unique for route:cache; the matched copy answers to the plain name.
+                // Copies are named localization.{code}.… for route:cache; the matched one takes the plain name.
                 $event->route->action['as'] = $localized->name($event->route);
             }
         });
@@ -52,8 +51,8 @@ class LocalizationServiceProvider extends ServiceProvider
         $this->publishes([__DIR__ . '/../config/localization.php' => $this->app->configPath('localization.php')], 'localization-config');
 
         if (Locales::configured() !== null && config('localization.remember_locale') !== false) {
-            // ResolveLocale right after StartSession so CSRF, throttle and auth refusals use the visitor's language.
-            // ApplyLocale reads the user and may redirect: after AuthenticateSession, or last if an app omits it.
+            // ResolveLocale after StartSession, so CSRF and auth refusals are translated.
+            // ApplyLocale after AuthenticateSession, as it reads the user.
             $this->callAfterResolving(Kernel::class, static function (HttpKernel $kernel): void {
                 if (array_key_exists('web', $kernel->getMiddlewareGroups())) {
                     $kernel->appendMiddlewareToGroup('web', ResolveLocale::class)
@@ -66,7 +65,7 @@ class LocalizationServiceProvider extends ServiceProvider
             $this->loadRoutesFrom(__DIR__ . '/../routes/locale.php');
         }
 
-        // Typed mixed so a laravel-seo 0.2 call (Locales first) gets the upgrade message, not a TypeError.
+        // mixed, not Closure: a laravel-seo 0.2 call gets the upgrade message, not a TypeError.
         Router::macro('localized', function (mixed $routes): void {
             if (! $routes instanceof Closure) {
                 throw new LogicException("Route::localized() takes only the routes closure: set the languages in config('localization.locales') as a list of codes, default first.");
@@ -76,7 +75,6 @@ class LocalizationServiceProvider extends ServiceProvider
             $locales = Locales::configured();
 
             if ($locales === null) {
-                // Languages left in config/seo.php would otherwise leave every /fr/… URL a silent 404.
                 $legacy = config('seo.locales');
 
                 if (is_array($legacy) && count($legacy) >= 2) {
@@ -94,22 +92,19 @@ class LocalizationServiceProvider extends ServiceProvider
                 throw new LogicException('Route::localized() cannot sit inside a prefix group or another Route::localized(): the locale must be the first path segment.');
             }
 
-            // A plain action key, not Route::metadata(), survives group merging and route:cache on Laravel 12.
+            // Plain action key, not Route::metadata(): survives group merging and route:cache on Laravel 12.
             $marker = static fn (string $code): array => [LocalizedRoute::ACTION => ['codes' => $locales->codes, 'default' => $locales->default, 'locale' => $code]];
             $others = array_values(array_diff($locales->codes, [$locales->default]));
-            // Laravel 13 lists domain routes first, so copies aren't the tail; holding $before also stops id reuse.
+            // Laravel 13 lists domain routes first, so copies aren't the tail; holding $before stops object-id reuse.
             $before = $this->getRoutes()->getRoutes();
             $seen = array_flip(array_map(spl_object_id(...), $before));
-            // Keyed by domain and URI, so an app's own GET on a redirect's URI is kept, not replaced by the redirect.
             $taken = $this->getRoutes()->get('GET');
 
             foreach ($others as $code) {
-                // route:cache rejects duplicate names, but not the bare `localization.{code}.` of unnamed routes.
                 $this->group($marker($code) + ['prefix' => $code, 'as' => "localization.{$code}."], $routes);
             }
 
-            // /en/terms 301s to /terms (en the default), one per GET page, built from the first other copy as the
-            // default's routes register later. Fallbacks get none, so unknown /en/… paths are not redirected.
+            // /en/… → /… redirects, built from the first other copy: the default's routes register later.
             foreach ($this->getRoutes()->getRoutes() as $copy) {
                 $localized = LocalizedRoute::of($copy);
 
@@ -123,16 +118,15 @@ class LocalizationServiceProvider extends ServiceProvider
                     continue;
                 }
 
-                // Domain in the action, not ->domain(), since the collection files a route by domain as it adds it.
-                // The leading backslash, as in Route::redirect(), stops a `namespace` group prefixing the class.
+                // Domain in the action: routes are filed by domain on add. Leading `\` escapes `namespace` groups.
                 $this->get($uri, ['uses' => '\\' . RedirectToDefaultCopy::class, RedirectToDefaultCopy::ACTION => $locales->default] + array_filter(['domain' => $copy->getDomain()]))
                     ->where($copy->wheres);
             }
 
-            // Default last: first match wins, and a default {page} route would otherwise catch /fr/… and /en/….
+            // Default last: first match wins, and its {page} route would catch /fr/… and /en/….
             $this->group($marker($locales->default), $routes);
 
-            // A route-level prefix (->prefix()) lands before the group's, and only the finished URIs show it.
+            // A route-level ->prefix() lands before the group's; only the finished URIs show it.
             foreach ($this->getRoutes()->getRoutes() as $route) {
                 $localized = LocalizedRoute::of($route);
 
@@ -150,7 +144,6 @@ class LocalizationServiceProvider extends ServiceProvider
 
         SeoAlternates::register($this->app);
 
-        // Maps from any copy, since action() finds whichever copy the route collection kept.
         $this->callAfterResolving('url', static function (UrlGenerator $url): void {
             $previous = $url->pathFormatter();
 

@@ -12,7 +12,7 @@
          failOnWarning="true"
          displayDetailsOnPhpunitDeprecations="true">
     <php>
-        <!-- Laravel's error handler swallows deprecations, so failOnDeprecation alone never fires. -->
+        <!-- Else Laravel's handler swallows deprecations and failOnDeprecation never fires. -->
         <env name="TESTBENCH_CONVERT_DEPRECATIONS_TO_EXCEPTIONS" value="true"/>
     </php>
     <testsuites>

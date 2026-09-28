@@ -8,7 +8,6 @@ use Illuminate\Routing\Events\RouteMatched;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 
-/** A RouteMatched listener set before the package boots, as an error tracker naming transactions. */
 final class EarlierListenerProvider extends ServiceProvider
 {
     /** @var list<?string> */

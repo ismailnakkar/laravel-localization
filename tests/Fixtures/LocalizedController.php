@@ -6,7 +6,6 @@ namespace Localization\Tests\Fixtures;
 
 use Illuminate\Support\Facades\Route;
 
-/** A controller, so action() has something to look up. */
 final class LocalizedController
 {
     /** @return array{locale: string, route: string, action: string, name: ?string, is: bool, routeIs: bool} */

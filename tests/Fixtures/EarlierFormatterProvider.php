@@ -7,7 +7,6 @@ namespace Localization\Tests\Fixtures;
 use Illuminate\Routing\UrlGenerator;
 use Illuminate\Support\ServiceProvider;
 
-/** Sets a URL formatter before the package boots; it must still run, after the package's. */
 final class EarlierFormatterProvider extends ServiceProvider
 {
     public function boot(): void

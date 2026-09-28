@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use LogicException;
 
-/** laravel-seo 0.4 kept the language keys in config/seo.php; left there, they must fail loudly. */
 final class UpgradeGuardTest extends TestCase
 {
     public function test_languages_left_in_config_seo_make_route_localized_throw(): void

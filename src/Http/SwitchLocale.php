@@ -19,16 +19,12 @@ use LogicException;
 use Symfony\Component\HttpFoundation\Exception\BadRequestException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
-/**
- * Saves the visitor's language and redirects back to `to` in it.
- *
- * @internal The localization.switch route is the API.
- */
+/** @internal */
 final class SwitchLocale
 {
     public function __invoke(Request $request): RedirectResponse
     {
-        // A route:cache built while remember_locale was on still routes here.
+        // route:cache built with remember_locale on still routes here.
         abort_if(config('localization.remember_locale') === false, 404);
         $locales = Locales::configured() ?? abort(404);
         $code = (string)$request->validate(['locale' => ['required', 'string', Rule::in($locales->codes)]])['locale'];
@@ -40,8 +36,7 @@ final class SwitchLocale
         UserLocale::save($request->user(), $code);
 
         $to = $request->input('to');
-        // Drop `to`'s subdirectory base path, which redirect()->to() adds again. Read it from getRequestUri(), not
-        // getBaseUrl(), which also holds a trusted X-Forwarded-Prefix.
+        // Strip the base path redirect()->to() re-adds. From getRequestUri(): getBaseUrl() trusts X-Forwarded-Prefix.
         $path = explode('?', $request->getRequestUri(), 2)[0];
         $base = substr($path, 0, strlen($path) - strlen($request->getPathInfo()));
 
@@ -54,7 +49,7 @@ final class SwitchLocale
         return redirect()->to(self::isPath($target) ? $target : '/', 303);
     }
 
-    /** `to` in $code. The caller re-checks that the result is a path on this host. */
+    /** The caller re-checks isPath() on the result. */
     private static function target(Request $request, mixed $to, string $code): string
     {
         if (! self::isPath($to)) {
@@ -89,10 +84,7 @@ final class SwitchLocale
         }
     }
 
-    /**
-     * $code's copy of a signed page, re-signed with its URI parameters (not ->defaults()) and expiry; null unless
-     * the signature is valid and the result is this route in $code on this scheme and host: never a signing oracle.
-     */
+    /** Signing-oracle guard: null unless validly signed and landing on this route in $code. Never ->defaults(). */
     private static function signedAgain(Request $request, Request $probe, Route $route, LocalizedRoute $localized, string $code): ?string
     {
         $name = $localized->name($route);
@@ -101,7 +93,7 @@ final class SwitchLocale
             return null;
         }
 
-        // Current key only: a previous app.key still validates requests, but renewing under it defeats rotation.
+        // Current key only: renewing a previous-key signature defeats key rotation.
         if (! app('url')->withKeyResolver(static fn () => config('app.key'))->hasValidSignature($probe)) {
             return null;
         }
@@ -114,11 +106,11 @@ final class SwitchLocale
             $signed = app('url')->signedRoute(
                 $name,
                 Arr::only($route->parameters(), $route->parameterNames()) + Arr::except($probe->query(), ['signature', 'expires']),
-                // A timestamp, not an int: an int means "seconds from now" and would push the expiry out.
+                // A Carbon, not an int: an int means seconds from now.
                 is_numeric($expires) ? Carbon::createFromTimestamp((int)$expires) : null,
             );
         } catch (UrlGenerationException|InvalidArgumentException) {
-            // $name now belongs to another route, one this page's parameters don't fit.
+            // $name may now be another route these parameters don't fit.
             return null;
         } finally {
             app()->setLocale($previous);
@@ -130,7 +122,7 @@ final class SwitchLocale
             return null;
         }
 
-        // $name may name a route on another host or domain group. Check the host first: never hand out its signature.
+        // $name may be on another host: never hand out its signature.
         if (strcasecmp($signedRequest->getSchemeAndHttpHost(), $request->getSchemeAndHttpHost()) !== 0) {
             return null;
         }
@@ -155,7 +147,7 @@ final class SwitchLocale
         return $signedRequest->getRequestUri();
     }
 
-    /** Open-redirect guard: a browser may read //, a backslash, a control character or a space as another host. */
+    /** Open-redirect guard: browsers may read //, a backslash, a control char or a space as another host. */
     private static function isPath(mixed $value): bool
     {
         return is_string($value)
