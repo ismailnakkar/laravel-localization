@@ -39,7 +39,8 @@ Render `<html lang="{{ app()->getLocale() }}">`, add [the switcher](#language) a
   else `Accept-Language`'s, else the default. A localized copy renders its URL's language; other pages in `web` render
   theirs.
 - Opening a copy records nothing (beyond filling an empty account once, see [Account language](#account-language)).
-  Only a choice is kept: in the session and, with `user_locale`, the account.
+  Only a choice is kept: in the session, in a `localization` cookie for a year (so a guest keeps it past the session),
+  and with `user_locale` the account.
 - Arriving from outside the site (another site, a bookmark, a typed URL) on any localized page's default copy 302s to the
   account's language, else the chosen one; never to `Accept-Language`'s, which is only suggested. Typing `/en/…`
   opens the default copy regardless. Crawlers, signed links and internal clicks are exempt. Don't let a CDN cache

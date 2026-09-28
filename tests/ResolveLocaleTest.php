@@ -35,7 +35,6 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Localization\Http\ApplyLocale;
 use Localization\Http\ResolveLocale;
-use Localization\Language;
 use Localization\Tests\Fixtures\Admin;
 use Localization\Tests\Fixtures\AuthenticateSession as AppAuthenticateSession;
 use Localization\Tests\Fixtures\LocaleCode;
@@ -287,6 +286,18 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $user->mergeCasts(['locale' => LocaleCode::class]);
 
         $this->actingAs($user)->get('/plain')->assertContent('fr');
+    }
+
+    /** A week idle, a sign-out: the session ends, and the cookie the switcher set keeps what the guest chose. */
+    public function test_a_guests_choice_outlives_the_session_through_its_cookie(): void
+    {
+        $this->withCookie(ResolveLocale::COOKIE, 'fr')->withHeader('Accept-Language', 'es')->get('/plain')->assertContent('fr');
+        $this->withHeaders(['Sec-Fetch-Site' => 'none', 'Sec-Fetch-Dest' => 'document'])->get('/terms')->assertRedirect('/fr/terms');
+
+        // The session's choice is the newer one; a code no longer configured is none.
+        $this->withSession([ResolveLocale::PICKED_KEY => 'ar'])->get('/plain')->assertContent('ar');
+        $this->flushSession();
+        $this->withCookie(ResolveLocale::COOKIE, 'de')->get('/plain')->assertContent('es');
     }
 
     public function test_a_pick_beats_the_browser(): void

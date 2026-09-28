@@ -75,11 +75,12 @@ final class SwitchLocaleTest extends LanguagesTestCase
             ->assertSessionHasErrors('locale');
     }
 
-    public function test_the_choice_is_saved_to_the_session_and_the_account(): void
+    public function test_the_choice_is_saved_to_the_session_the_cookie_and_the_account(): void
     {
         $user = User::create(['name' => 'member', 'locale' => 'en']);
 
-        $this->actingAs($user)->post('/locale', ['locale' => 'fr', 'to' => '/plain'])->assertStatus(303)->assertRedirect('/plain');
+        $this->actingAs($user)->post('/locale', ['locale' => 'fr', 'to' => '/plain'])->assertStatus(303)->assertRedirect('/plain')
+            ->assertCookie(ResolveLocale::COOKIE, 'fr')->assertCookieNotExpired(ResolveLocale::COOKIE);
 
         $this->assertSame('fr', session(ResolveLocale::PICKED_KEY));
         $this->assertSame('fr', $user->fresh()?->locale);

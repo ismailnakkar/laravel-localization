@@ -44,7 +44,8 @@ final class SwitchLocale
 
         $target = self::target($request, $to, $code);
 
-        return redirect()->to(self::isPath($target) ? $target : '/', 303);
+        return redirect()->to(self::isPath($target) ? $target : '/', 303)
+            ->withCookie(cookie(ResolveLocale::COOKIE, $code, 60 * 24 * 365));
     }
 
     /** The caller re-checks isPath() on the result. */

@@ -4,6 +4,13 @@ All notable changes are listed here, following [Keep a Changelog](https://keepac
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While 0.x, breaking changes bump the minor. Anything
 marked `@internal` may change in any release.
 
+## [0.3.1] - 2026-09-28
+
+### Added
+
+- A choice is also kept in a `localization` cookie for a year (`ResolveLocale::COOKIE`), so a guest keeps it past the
+  session. Only `localization.switch` sets it; the session's choice is read first.
+
 ## [0.3.0] - 2026-09-28
 
 To upgrade, make the [suggestion banner](https://github.com/ismailnakkar/laravel-localization#account-language)'s
@@ -67,6 +74,7 @@ Extracted from laravel-seo 0.4.2 under new names. To upgrade, follow its
 
 - The switcher no longer doubles the base path in apps served from a subdirectory (`/app/app/terms`).
 
+[0.3.1]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.1.0
