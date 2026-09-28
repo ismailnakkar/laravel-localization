@@ -1,27 +1,22 @@
 # Changelog
 
-All notable changes to `ismailnakkar/laravel-localization` are listed here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+All notable changes are listed here, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html). While 0.x, breaking changes bump the minor. Anything
+marked `@internal` may change in any release.
 
-Semver covers what the README documents; anything marked `@internal` may change in any release.
+## [0.1.0] - 2026-09-28
 
-## [1.0.0] - 2026-09-28
-
-Extracted from ismailnakkar/laravel-seo 0.4.2, with the same behaviour under new names (bar one fix, below): every
-step is in its [UPGRADE.md](https://github.com/ismailnakkar/laravel-seo/blob/main/UPGRADE.md#from-04-to-05).
+Extracted from laravel-seo 0.4.2 under new names. To upgrade, follow its
+[UPGRADE.md](https://github.com/ismailnakkar/laravel-seo/blob/main/UPGRADE.md#from-04-to-05).
 
 ### Added
 
-- `localization:check` FAILs while `config/seo.php` still sets `locales`, `user_locale`, `entry_redirect` or
-  `remember_locale => false`, and `Route::localized()` throws while `seo.locales` lists two or more codes and
-  `localization.locales` fewer: languages left there would otherwise make every `/fr/…` URL a silent 404.
-- With laravel-seo 0.5 installed, the localized routes' canonicals, hreflang and sitemap alternates, through its
-  `Seo::alternatesUsing()`.
+- `localization:check` fails while laravel-seo 0.4's language keys remain in `config/seo.php`, and
+  `Route::localized()` throws while only `seo.locales` lists languages.
+- Canonicals, hreflang and sitemap alternates for localized routes with laravel-seo 0.5.
 
 ### Fixed
 
-- The switcher in an app served from a subdirectory: `to` carries the base path, which the redirect added again, so
-  `/app/terms` landed on `/app/app/terms` instead of `/app/fr/terms`.
+- The switcher no longer doubles the base path in apps served from a subdirectory (`/app/app/terms`).
 
-[1.0.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v1.0.0
+[0.1.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.1.0
