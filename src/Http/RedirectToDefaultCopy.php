@@ -23,7 +23,7 @@ final class RedirectToDefaultCopy
         $path = '/' . ltrim(LocalizedRoute::withoutPrefix($request->getPathInfo(), (string)$route->getAction(self::ACTION)), '/');
         $query = (string)$request->server->get('QUERY_STRING');
 
-        // No-cache: a browser-cached 301 would skip ApplyLocale, which records the choice.
+        // No-cache: a browser-cached 301 would skip ApplyLocale, whose flash keeps the landing from being entry-redirected.
         return redirect()->to($path . ($query === '' ? '' : "?{$query}"), 301, ['Cache-Control' => 'no-cache, private']);
     }
 }

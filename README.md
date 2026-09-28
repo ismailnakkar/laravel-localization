@@ -35,14 +35,13 @@ Render `<html lang="{{ app()->getLocale() }}">`, add [the switcher](#language) a
 
 ## Language
 
-- A localized page renders its URL's language. Other pages in `web` use the account's, else the one picked (switcher
-  or [suggestion](#account-language)), else the last copy opened, else `Accept-Language`, else the default.
-- Opening a copy (page load, Inertia, `wire:navigate`, link from another site) makes it the last one opened; the bare
-  default copy counts only when reached from inside the site. Signed links and Livewire updates don't, nor (in browsers
-  sending Fetch Metadata) `<img>` and iframes. Prefetch counts: exclude links to other languages from it (e.g.
-  `data-turbo-prefetch="false"`).
-- Arriving from outside the site (another site, a bookmark, a typed URL) on a localized page's default copy 302s to the
-  account's language, else the picked one; never to `Accept-Language`'s, which is only suggested. Typing `/en/…`
+- The visitor's language is their account's, else the one they chose (switcher or [suggestion](#account-language)),
+  else `Accept-Language`'s, else the default. A localized copy renders its URL's language; other pages in `web` render
+  theirs.
+- Opening a copy records nothing (beyond filling an empty account once, see [Account language](#account-language)).
+  Only a choice is kept: in the session and, with `user_locale`, the account.
+- Arriving from outside the site (another site, a bookmark, a typed URL) on any localized page's default copy 302s to the
+  account's language, else the chosen one; never to `Accept-Language`'s, which is only suggested. Typing `/en/…`
   opens the default copy regardless. Crawlers, signed links and internal clicks are exempt. Don't let a CDN cache
   localized pages' HTML.
 - On Laravel 13, a POST catch-all inside `Route::domain()` shadows the switcher's `POST /locale`.
@@ -69,8 +68,8 @@ Set `user_locale` to your users' language column. A member's account language ou
 saves it; an account without one gets the language on screen once (a value outside `locales` counts as none and is overwritten);
 models without the column are skipped. Implement `HasLocalePreference` returning that column so mail uses it.
 
-A visitor who told us no language (no account language, nothing picked) and whose browser prefers another gets a
-suggestion. Render this in your layout (not error views); either answer is a pick, so it isn't asked again:
+Anyone, members too, whose language differs from the page's gets a suggestion. Render this in your layout (not error
+views); either answer is kept like a switcher choice, so the banner goes:
 
 ```blade
 @inject('localization', \Localization\Localization::class)
@@ -81,7 +80,7 @@ suggestion. Render this in your layout (not error views); either answer is a pic
             <input type="hidden" name="to" value="{{ request()->getRequestUri() }}">
             <p>{{ __('Show this site in :language?', ['language' => __("languages.{$suggestion->code}", locale: $suggestion->code)], $suggestion->code) }}</p>
             <button name="locale" value="{{ $suggestion->code }}">{{ __('Yes', locale: $suggestion->code) }}</button>
-            <button name="locale" value="{{ app()->getLocale() }}">{{ __('No, thanks', locale: $suggestion->code) }}</button>
+            <button name="locale" value="{{ app()->getLocale() }}">{{ __('Use :language', ['language' => __('languages.'.app()->getLocale(), locale: app()->getLocale())], $suggestion->code) }}</button>
         </form>
     </aside>
 @endif
@@ -95,9 +94,11 @@ The default save fires model events. To save the column your own way, call this 
 $localization->saveUserLocaleUsing(fn (User $user, string $code) => app(Users::class)->setLocale($user, $code));
 ```
 
+Don't render the suggestion while impersonating either: no answer is saved, so it would never go.
+
 ## Middleware
 
-With two or more `locales` and `remember_locale` on, `ResolveLocale` (right after `StartSession`, so CSRF and throttle
+With two or more `locales`, `ResolveLocale` (right after `StartSession`, so CSRF and throttle
 errors are translated) and `ApplyLocale` (right after `\Illuminate\Contracts\Session\Middleware\AuthenticatesSessions`,
 as it reads the user) join `web`. `ApplyLocale` must run after your session check:
 
@@ -107,19 +108,11 @@ as it reads the user) join `web`. `ApplyLocale` must run after your session chec
 - Livewire: add `\Localization\Http\ResolveLocale::class` and `\Localization\Http\ApplyLocale::class` to
   `Livewire::addPersistentMiddleware()`.
 
-With `'remember_locale' => false`, only a copy's URL sets the language (no session, account, switcher, entry redirect
-or suggestion); `route()`, `languages()` and laravel-seo still work. Pick `$code` in your own middleware (with Livewire,
-add it to `Livewire::addPersistentMiddleware()`) and call
-`app()->setLocale(\Localization\LocalizedRoute::of($request->route())->locale ?? $code)`. To redirect old `?lang=fr`
-URLs, check `$code` is one of your locales, then redirect to
-`LocalizedRoute::of($request->route())?->path($request->getPathInfo(), $code)`.
-
 ## Configuration
 
 | Key | Default | |
 |---|---|---|
 | `locales` | `[]` | Language codes, default first. Fewer than two turns everything off. |
-| `remember_locale` | `true` | `false`: only a copy's URL sets the language. |
 | `user_locale` | `null` | The users table's language column. `null`: session only. |
 
 Codes are ISO 639-1 plus an optional script and region, cased exactly (`en`, `en-GB`, `zh-Hant`). `es-419` and `fil`
@@ -127,7 +120,7 @@ are refused, as Google ignores them in hreflang: use `es`, `tl`. A code is also 
 translation folders after it (`lang/pt-BR/`, not `pt_BR`).
 
 `localization:check` exits 1 on any FAIL. Its rows: `leftover keys` (no laravel-seo 0.4 language keys left in
-`config/seo.php`), `entry_redirect` (WARN while this 0.1 key is still set), `user_locale` (the default guard's users
-table has the column; WARN when it can't check).
+`config/seo.php`), `entry_redirect` and `remember_locale` (WARN while these keys from older releases are still set),
+`user_locale` (the default guard's users table has the column; WARN when it can't check).
 
 [MIT licensed](LICENSE).

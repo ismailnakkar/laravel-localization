@@ -30,15 +30,12 @@ final class CheckCommand extends Command
     {
         $this->failed = false;
         $leftover = array_values(array_filter(self::LEFTOVER_KEYS, static fn (string $key): bool => filled($config->get($key))));
-
-        // Only false: true was the old default; an ignored false silently re-enables remembering.
-        if ($config->get('seo.remember_locale') === false) {
-            $leftover[] = 'seo.remember_locale';
-        }
-        $off = $config->get('localization.remember_locale') === false;
-        $stale = filled($config->get('localization.entry_redirect'));
+        $stale = array_filter([
+            'entry_redirect'  => filled($config->get('localization.entry_redirect')) ? 'ignored since 0.2, remove it: every localized page now redirects to a known language' : null,
+            'remember_locale' => $config->get('localization.remember_locale') !== null ? 'ignored since 0.3, remove it: the language is always remembered' : null,
+        ]);
         $column = UserLocale::column();
-        $languages = Locales::configured() !== null && ($stale || $column !== null);
+        $languages = Locales::configured() !== null && ($stale !== [] || $column !== null);
 
         if ($leftover === [] && ! $languages) {
             return self::SUCCESS;
@@ -51,7 +48,7 @@ final class CheckCommand extends Command
         }
 
         if ($languages) {
-            $this->languages($config, $off, $stale, $column);
+            $this->languages($config, $stale, $column);
         }
 
         $this->write();
@@ -59,14 +56,15 @@ final class CheckCommand extends Command
         return $this->failed ? self::FAILURE : self::SUCCESS;
     }
 
-    private function languages(Repository $config, bool $off, bool $stale, ?string $column): void
+    /** @param  array<string, string>  $stale  key => why it is ignored */
+    private function languages(Repository $config, array $stale, ?string $column): void
     {
-        if ($stale) {
-            $this->row('entry_redirect', 'WARN', 'ignored since 0.2, remove it: every localized page now redirects to a known language');
+        foreach ($stale as $key => $detail) {
+            $this->row($key, 'WARN', $detail);
         }
 
         if ($column !== null) {
-            $this->row('user_locale', ...($off ? ['WARN', 'ignored while remember_locale is false'] : self::userColumn($config, $column)));
+            $this->row('user_locale', ...self::userColumn($config, $column));
         }
     }
 

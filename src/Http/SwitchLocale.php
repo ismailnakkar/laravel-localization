@@ -24,14 +24,11 @@ final class SwitchLocale
 {
     public function __invoke(Request $request): RedirectResponse
     {
-        // route:cache built with remember_locale on still routes here.
-        abort_if(config('localization.remember_locale') === false, 404);
         $locales = Locales::configured() ?? abort(404);
         $code = (string)$request->validate(['locale' => ['required', 'string', Rule::in($locales->codes)]])['locale'];
 
         if ($request->hasSession()) {
             $request->session()->put(ResolveLocale::PICKED_KEY, $code);
-            $request->session()->put(ResolveLocale::SESSION_KEY, $code);
         }
 
         UserLocale::save($request->user(), $code);

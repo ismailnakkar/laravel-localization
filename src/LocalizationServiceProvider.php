@@ -50,7 +50,7 @@ class LocalizationServiceProvider extends ServiceProvider
     {
         $this->publishes([__DIR__ . '/../config/localization.php' => $this->app->configPath('localization.php')], 'localization-config');
 
-        if (Locales::configured() !== null && config('localization.remember_locale') !== false) {
+        if (Locales::configured() !== null) {
             // ResolveLocale after StartSession, so CSRF and auth refusals are translated.
             // ApplyLocale after AuthenticateSession, as it reads the user.
             $this->callAfterResolving(Kernel::class, static function (HttpKernel $kernel): void {
@@ -78,7 +78,7 @@ class LocalizationServiceProvider extends ServiceProvider
                 $legacy = config('seo.locales');
 
                 if (is_array($legacy) && count($legacy) >= 2) {
-                    throw new LogicException("Route::localized(): move 'locales', 'remember_locale' and 'user_locale' from config/seo.php to config/localization.php.");
+                    throw new LogicException("Route::localized(): move 'locales' and 'user_locale' from config/seo.php to config/localization.php.");
                 }
 
                 $this->group([], $routes);

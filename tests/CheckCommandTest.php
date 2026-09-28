@@ -43,33 +43,27 @@ final class CheckCommandTest extends TestCase
         $this->assertSame(0, $code);
     }
 
-    public function test_the_account_column_warns_while_the_locale_is_not_remembered(): void
+    /** Both are ignored now, true or false: left in a published config, they would only mislead. */
+    public function test_keys_from_older_releases_warn_until_removed(): void
     {
         config([
             'localization.locales'         => ['en', 'fr'],
             'localization.remember_locale' => false,
             'localization.entry_redirect'  => ['home'],
-            'localization.user_locale'     => 'locale',
-            'auth.providers.users.model'   => User::class,
         ]);
 
         [$code, $output] = $this->check();
 
-        $this->assertStringContainsString(<<<'TXT'
-            languages
-              entry_redirect . WARN ignored since 0.2, remove it: every localized page now redirects to a known language
-              user_locale .... WARN ignored while remember_locale is false
-
-            TXT, $output);
+        $this->assertStringContainsString("  entry_redirect . WARN ignored since 0.2, remove it: every localized page now redirects to a known language\n", $output);
+        $this->assertStringContainsString("  remember_locale  WARN ignored since 0.3, remove it: the language is always remembered\n", $output);
         $this->assertSame(0, $code);
 
-        config(['localization.entry_redirect' => []]);
+        config(['localization.entry_redirect' => [], 'localization.remember_locale' => true]);
         [, $output] = $this->check();
 
-        $this->assertStringContainsString("languages\n  user_locale .... WARN ignored while remember_locale is false\n", $output);
-        $this->assertStringNotContainsString('entry_redirect', $output);
+        $this->assertSame("languages\n  remember_locale  WARN ignored since 0.3, remove it: the language is always remembered\n\n", $output);
 
-        config(['localization.user_locale' => null]);
+        config(['localization.remember_locale' => null]);
 
         $this->assertSame([0, ''], $this->check());
     }

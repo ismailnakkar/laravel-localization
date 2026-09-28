@@ -27,7 +27,7 @@ final class SwitchLocaleTest extends LanguagesTestCase
                     <input type="hidden" name="to" value="{{ request()->getRequestUri() }}">
                     <p>{{ __('Show this site in :language?', ['language' => __("languages.{$suggestion->code}", locale: $suggestion->code)], $suggestion->code) }}</p>
                     <button name="locale" value="{{ $suggestion->code }}">{{ __('Yes', locale: $suggestion->code) }}</button>
-                    <button name="locale" value="{{ app()->getLocale() }}">{{ __('No, thanks', locale: $suggestion->code) }}</button>
+                    <button name="locale" value="{{ app()->getLocale() }}">{{ __('Use :language', ['language' => __('languages.'.app()->getLocale(), locale: app()->getLocale())], $suggestion->code) }}</button>
                 </form>
             </aside>
         @endif
@@ -65,7 +65,7 @@ final class SwitchLocaleTest extends LanguagesTestCase
 
         $this->post('/locale', ['locale' => 'fr', 'to' => '/terms'])->assertStatus(419);
 
-        $this->assertNotSame('fr', session(ResolveLocale::SESSION_KEY));
+        $this->assertNotSame('fr', session(ResolveLocale::PICKED_KEY));
     }
 
     public function test_an_unknown_language_is_refused(): void
@@ -82,21 +82,8 @@ final class SwitchLocaleTest extends LanguagesTestCase
         $this->actingAs($user)->post('/locale', ['locale' => 'fr', 'to' => '/plain'])->assertStatus(303)->assertRedirect('/plain');
 
         $this->assertSame('fr', session(ResolveLocale::PICKED_KEY));
-        $this->assertSame('fr', session(ResolveLocale::SESSION_KEY));
         $this->assertSame('fr', $user->fresh()?->locale);
         $this->get('/plain')->assertContent('fr');
-    }
-
-    public function test_a_cached_route_refuses_once_the_locale_is_not_remembered(): void
-    {
-        $user = User::create(['name' => 'member', 'locale' => 'en']);
-        // Set after boot: a route:cache built with remember_locale on keeps the route.
-        config(['localization.remember_locale' => false]);
-
-        $this->actingAs($user)->post('/locale', ['locale' => 'fr', 'to' => '/plain'])->assertNotFound();
-
-        $this->assertNull(session(ResolveLocale::SESSION_KEY));
-        $this->assertSame('en', $user->fresh()?->locale);
     }
 
     public function test_the_account_is_saved_through_the_closure(): void
@@ -359,7 +346,7 @@ final class SwitchLocaleTest extends LanguagesTestCase
         $to = self::pathAndQuery(URL::signedRoute('lockedloc', ['user' => 5]));
 
         // So the locale to restore is 'es', not the default.
-        $this->withSession([ResolveLocale::SESSION_KEY => 'es']);
+        $this->withSession([ResolveLocale::PICKED_KEY => 'es']);
 
         $location = (string)$this->post('/locale', ['locale' => 'ar', 'to' => $to])->assertStatus(303)->headers->get('Location');
 
@@ -417,7 +404,7 @@ final class SwitchLocaleTest extends LanguagesTestCase
         assert($routes instanceof RouteCollection);
         $router->setCompiledRoutes($routes->compile());
 
-        $this->withSession([ResolveLocale::SESSION_KEY => 'fr'])->get('/plain')->assertContent('fr');
+        $this->withSession([ResolveLocale::PICKED_KEY => 'fr'])->get('/plain')->assertContent('fr');
         $this->get('/es/terms')->assertContent('es');
         $this->post('/locale', ['locale' => 'ar', 'to' => '/terms?x=1'])->assertHeader('Location', 'http://localhost/ar/terms?x=1');
 
@@ -469,33 +456,73 @@ final class SwitchLocaleTest extends LanguagesTestCase
         $this->assertMatchesRegularExpression('~value="ar" lang="ar"\s*>العربية</button>~', $html);
     }
 
-    /** @return iterable<string, array{string, string}> the answer, where it lands */
-    public static function bannerAnswers(): iterable
+    private function translateTheBanner(): void
     {
-        yield 'yes' => ['fr', '/fr/banner'];
-        yield 'no, thanks' => ['en', '/banner'];
+        $translator = $this->app->make('translator');
+        $translator->addLines(['languages.en' => 'anglais', 'languages.fr' => 'français', '*.Show this site in :language?' => 'Afficher ce site en :language ?', '*.Yes' => 'Oui', '*.Use :language' => 'Utiliser :language'], 'fr');
+        $translator->addLines(['languages.en' => 'English', 'languages.fr' => 'French'], 'en');
     }
 
-    #[DataProvider('bannerAnswers')]
-    public function test_either_answer_to_the_readme_banner_is_a_pick(string $answer, string $lands): void
+    /** "Use français" approves the page's language: kept like a switcher choice, so the banner goes. */
+    public function test_a_member_who_keeps_the_page_language_saves_it_to_the_account_and_the_banner_goes(): void
     {
-        $this->app->make('translator')->addLines(['languages.fr' => 'français', '*.Show this site in :language?' => 'Afficher ce site en :language ?', '*.Yes' => 'Oui', '*.No, thanks' => 'Non merci'], 'fr');
+        $this->translateTheBanner();
+        $user = User::create(['name' => 'member', 'locale' => 'en']);
+
+        $this->actingAs($user)->get('/fr/banner')->assertOk()
+            ->assertSee('<aside lang="en">', false)
+            ->assertSee('<input type="hidden" name="to" value="/fr/banner">', false)
+            ->assertSee('<p>Show this site in English?</p>', false)
+            ->assertSee('<button name="locale" value="en">Yes</button>', false)
+            ->assertSee('<button name="locale" value="fr">Use français</button>', false);
+
+        $this->post('/locale', ['locale' => 'fr', 'to' => '/fr/banner'])->assertRedirect('/fr/banner');
+
+        $this->assertSame('fr', session(ResolveLocale::PICKED_KEY));
+        $this->assertSame('fr', $user->fresh()?->locale);
+        $this->get('/fr/banner')->assertContent('fr');
+    }
+
+    public function test_yes_on_the_readme_banner_opens_their_language_and_saves_it(): void
+    {
+        $this->translateTheBanner();
         $this->withHeader('Accept-Language', 'fr');
 
         $this->get('/banner')->assertOk()
             ->assertSee('<aside lang="fr">', false)
-            ->assertSee('<input type="hidden" name="to" value="/banner">', false)
             ->assertSee('<p>Afficher ce site en français ?</p>', false)
             ->assertSee('<button name="locale" value="fr">Oui</button>', false)
-            ->assertSee('<button name="locale" value="en">Non merci</button>', false);
+            ->assertSee('<button name="locale" value="en">Utiliser English</button>', false);
 
-        $this->post('/locale', ['locale' => $answer, 'to' => '/banner'])->assertRedirect($lands);
+        $this->post('/locale', ['locale' => 'fr', 'to' => '/banner'])->assertRedirect('/fr/banner');
 
-        $this->assertSame($answer, session(ResolveLocale::PICKED_KEY));
-        $this->get($lands)->assertContent($answer);
-        // Neither the browser's language nor the answer on screen: only the pick keeps the banner away.
-        $this->get('/es/banner')->assertContent('es');
+        $this->assertSame('fr', session(ResolveLocale::PICKED_KEY));
+        $this->get('/fr/banner')->assertContent('fr');
+    }
 
+    /** A guest's "Use English" keeps the page's language as their choice, so the banner goes. */
+    public function test_a_guest_who_keeps_the_page_language_chooses_it_and_the_banner_goes(): void
+    {
+        $this->translateTheBanner();
+        $this->withHeader('Accept-Language', 'fr');
+
+        $this->get('/banner')->assertSee('<aside lang="fr">', false);
+        $this->post('/locale', ['locale' => 'en', 'to' => '/banner'])->assertRedirect('/banner');
+
+        $this->assertSame('en', session(ResolveLocale::PICKED_KEY));
+        $this->get('/banner')->assertContent('en');
+    }
+
+    /** Its sender chose a signed page's language, and one that can't be signed again would come back as is. */
+    public function test_a_signed_page_gets_no_suggestion(): void
+    {
+        $this->withHeader('Accept-Language', 'fr')->get(URL::signedRoute('prefs', ['user' => 1]))->assertOk()->assertContent('en');
+
+        $this->assertNull($this->localization()->suggestion());
+    }
+
+    public function test_the_readme_banner_is_the_one_tested_here(): void
+    {
         $this->assertStringContainsString(self::BANNER, (string)file_get_contents(__DIR__ . '/../README.md'));
     }
 
@@ -522,38 +549,34 @@ final class SwitchLocaleTest extends LanguagesTestCase
         $this->assertNull($this->localization()->accountLanguage());
     }
 
-    /** @return iterable<string, array{string, array<string, string>, ?string}> URI, headers, suggestion() */
+    /** @return iterable<string, array{string, array<string, string>, ?string, ?string}> URI, headers, choice, suggestion() */
     public static function suggestions(): iterable
     {
-        yield "the browser's language, another on screen" => ['/terms', ['Accept-Language' => 'fr'], 'fr'];
-        yield "the browser's language on screen" => ['/fr/terms', ['Accept-Language' => 'fr'], null];
-        yield 'no Accept-Language' => ['/terms', [], null];
-        yield 'a browser language not configured' => ['/terms', ['Accept-Language' => 'de'], null];
-        yield 'a crawler' => ['/terms', ['Accept-Language' => 'fr', 'User-Agent' => 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'], null];
+        yield 'a choice, another on screen' => ['/ar/terms', ['Accept-Language' => 'es'], 'fr', 'fr'];
+        yield 'the choice on screen' => ['/fr/terms', ['Accept-Language' => 'es'], 'fr', null];
+        yield "the browser's language, another on screen" => ['/terms', ['Accept-Language' => 'fr'], null, 'fr'];
+        yield "the browser's language on screen" => ['/fr/terms', ['Accept-Language' => 'fr'], null, null];
+        yield 'no Accept-Language' => ['/terms', [], null, null];
+        yield 'a browser language not configured' => ['/terms', ['Accept-Language' => 'de'], null, null];
+        yield 'a crawler' => ['/terms', ['Accept-Language' => 'fr', 'User-Agent' => 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'], null, null];
     }
 
     /** @param  array<string, string>  $headers */
     #[DataProvider('suggestions')]
-    public function test_the_suggestion_is_the_browsers_language_while_another_is_on_screen(string $uri, array $headers, ?string $suggestion): void
+    public function test_the_suggestion_is_the_visitors_language_while_another_is_on_screen(string $uri, array $headers, ?string $choice, ?string $suggestion): void
     {
-        $this->withHeaders($headers)->get($uri)->assertOk();
+        $this->withSession($choice === null ? [] : [ResolveLocale::PICKED_KEY => $choice])->withHeaders($headers)->get($uri)->assertOk();
 
         $this->assertEquals($suggestion === null ? null : new Language($suggestion, false), $this->localization()->suggestion());
     }
 
-    public function test_a_visitor_who_picked_gets_no_suggestion(): void
+    /** Over their browser's, which here is the page's. */
+    public function test_a_member_is_suggested_their_account_language_on_a_copy_in_another(): void
     {
-        $this->withSession([ResolveLocale::PICKED_KEY => 'en'])->withHeader('Accept-Language', 'fr')->get('/terms')->assertOk();
-
-        $this->assertNull($this->localization()->suggestion());
-    }
-
-    public function test_a_member_with_an_account_language_gets_no_suggestion(): void
-    {
-        $this->actingAs(User::create(['name' => 'member', 'locale' => 'en']))->withHeader('Accept-Language', 'fr')->get('/terms')->assertOk();
-        // The account alone: the request mirrored it into the pick, which would also hide the suggestion.
+        $this->actingAs(User::create(['name' => 'member', 'locale' => 'en']))->withHeader('Accept-Language', 'fr')->get('/fr/terms')->assertOk();
+        // The account alone: the request mirrored it into the choice, which would also give en.
         session()->forget(ResolveLocale::PICKED_KEY);
 
-        $this->assertNull($this->localization()->suggestion());
+        $this->assertEquals(new Language('en', false), $this->localization()->suggestion());
     }
 }

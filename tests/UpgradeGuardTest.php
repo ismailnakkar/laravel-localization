@@ -15,7 +15,7 @@ final class UpgradeGuardTest extends TestCase
         config(['seo.locales' => ['en', 'fr'], 'localization.locales' => []]);
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionMessage("Route::localized(): move 'locales', 'remember_locale' and 'user_locale' from config/seo.php to config/localization.php.");
+        $this->expectExceptionMessage("Route::localized(): move 'locales' and 'user_locale' from config/seo.php to config/localization.php.");
 
         Route::localized(static fn () => Route::get('terms', static fn () => 'terms'));
     }
@@ -34,18 +34,5 @@ final class UpgradeGuardTest extends TestCase
 
         $this->assertSame(1, Artisan::call('localization:check'));
         $this->assertStringContainsString('  leftover keys .. FAIL seo.user_locale: move them', Artisan::output());
-    }
-
-    public function test_remembering_switched_off_in_config_seo_fails_and_its_published_default_does_not(): void
-    {
-        config(['seo.remember_locale' => false]);
-
-        $this->assertSame(1, Artisan::call('localization:check'));
-        $this->assertStringContainsString('  leftover keys .. FAIL seo.remember_locale: move them', Artisan::output());
-
-        config(['seo.remember_locale' => true]);
-
-        $this->assertSame(0, Artisan::call('localization:check'));
-        $this->assertSame('', Artisan::output());
     }
 }

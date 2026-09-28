@@ -13,10 +13,7 @@ use Symfony\Component\HttpFoundation\Response;
 /** Never read the user: it would sign in a remember-me cookie before AuthenticateSession checks it. */
 final class ResolveLocale
 {
-    /** The last copy a URL named: fills in for pages without a language in the URL, never redirects. */
-    public const string SESSION_KEY = 'localization.browsing';
-
-    /** Set only by an answer (the switcher, a suggestion's buttons) or a member's account: known, so it redirects. */
+    /** The visitor's choice (the switcher, a suggestion's answer), or a member's account copied in. Nothing else. */
     public const string PICKED_KEY = 'localization.picked';
 
     public function handle(Request $request, Closure $next): Response
@@ -35,17 +32,13 @@ final class ResolveLocale
     /** @internal What the visitor told us first, then what we guess. */
     public static function choice(Request $request, Locales $locales, ?string $account = null): string
     {
-        return $account
-            ?? self::stored($request, self::PICKED_KEY, $locales)
-            ?? self::stored($request, self::SESSION_KEY, $locales)
-            ?? $locales->preferredBy($request)
-            ?? $locales->default;
+        return $account ?? self::stored($request, $locales) ?? $locales->preferredBy($request) ?? $locales->default;
     }
 
-    /** @internal The session's code under $key, if still configured. */
-    public static function stored(Request $request, string $key, Locales $locales): ?string
+    /** @internal The visitor's choice, if still configured. */
+    public static function stored(Request $request, Locales $locales): ?string
     {
-        $code = $request->hasSession() ? $request->session()->get($key) : null;
+        $code = $request->hasSession() ? $request->session()->get(self::PICKED_KEY) : null;
 
         return is_string($code) && in_array($code, $locales->codes, true) ? $code : null;
     }

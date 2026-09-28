@@ -28,8 +28,8 @@ final class ApplyLocale
         $localized = LocalizedRoute::of($request->route());
         $user = $request->user();
         $account = UserLocale::of($user, $locales);
-        // Known: the account or an answer. Never the browser, which is only a guess: that one is offered, not forced.
-        $known = $account ?? ResolveLocale::stored($request, ResolveLocale::PICKED_KEY, $locales);
+        // Known: the account or a choice. Never the browser, which is only a guess: that one is offered, not forced.
+        $known = $account ?? ResolveLocale::stored($request, $locales);
         $target = $this->entryTarget($request, $locales, $localized, $known);
 
         if ($target !== null) {
@@ -38,27 +38,25 @@ final class ApplyLocale
 
         $choice = ResolveLocale::choice($request, $locales, $account);
         $pageView = self::opensThePage($request);
-        $opened = $pageView ? self::opened($request, $locales, $localized) : null;
+        $hop = is_string($request->route()?->getAction(RedirectToDefaultCopy::ACTION));
 
+        // Opening a copy records nothing: only a choice is kept. A page in another language suggests theirs instead.
         if ($request->hasSession()) {
-            if ($opened !== null) {
-                $request->session()->put(ResolveLocale::SESSION_KEY, $opened);
-            }
-
-            if ($opened !== null && is_string($request->route()?->getAction(RedirectToDefaultCopy::ACTION))) {
+            if ($pageView && $hop) {
                 $request->session()->flash(self::DEFAULT_ASKED, true);
             }
 
             // So ResolveLocale, which never reads the user, speaks the account's language too.
-            if ($account !== null && ResolveLocale::stored($request, ResolveLocale::PICKED_KEY, $locales) !== $account) {
+            if ($account !== null && ResolveLocale::stored($request, $locales) !== $account) {
                 $request->session()->put(ResolveLocale::PICKED_KEY, $account);
             }
         }
 
-        // Page view only (a sibling's fetch can set Accept-Language); GET only (POST /locale saves the choice).
-        if ($pageView && $request->isMethod('GET') && $account === null && UserLocale::hasColumn($user)) {
-            // What the URL named, else what the page shows: a bare copy opened from outside shows the default.
-            rescue(static fn () => UserLocale::save($user, $opened ?? $localized->locale ?? $choice, unlessSet: $locales));
+        // Page view only (a sibling's fetch can set Accept-Language); GET only (POST /locale saves the choice); not the
+        // /en/… hop, which shows nothing: its landing fills it.
+        if ($pageView && ! $hop && $request->isMethod('GET') && $account === null && UserLocale::hasColumn($user)) {
+            // The language on screen: a bare copy opened from outside shows the default.
+            rescue(static fn () => UserLocale::save($user, $localized->locale ?? $choice, unlessSet: $locales));
         }
 
         app()->setLocale($localized->locale ?? $choice);
@@ -86,23 +84,6 @@ final class ApplyLocale
         $query = (string)$request->server->get('QUERY_STRING');
 
         return $localized->path($request->getPathInfo(), $known) . ($query === '' ? '' : "?{$query}");
-    }
-
-    /**
-     * The language a page view names: a prefixed copy's, or the default's typed as /en/…. A bare default copy names
-     * none from outside (a bookmark, an old link), only when clicked inside the site, where route() built it.
-     */
-    private static function opened(Request $request, Locales $locales, ?LocalizedRoute $localized): ?string
-    {
-        $redirect = $request->route()?->getAction(RedirectToDefaultCopy::ACTION);
-
-        if (is_string($redirect)) {
-            return $redirect;
-        }
-
-        return $localized !== null && ($localized->locale !== $locales->default || self::fromInsideTheSite($request))
-            ? $localized->locale
-            : null;
     }
 
     /**

@@ -34,12 +34,12 @@ class Localization
         return array_map(static fn (string $code): Language => new Language($code, $code === $current), $locales->codes);
     }
 
-    /** The signed-in user's saved language; null for a guest, a code outside `locales`, or remember_locale off. */
+    /** The signed-in user's saved language; null for a guest or a code outside `locales`. */
     public function accountLanguage(): ?string
     {
         $locales = Locales::configured();
 
-        if ($locales === null || config('localization.remember_locale') === false) {
+        if ($locales === null) {
             return null;
         }
 
@@ -48,8 +48,9 @@ class Localization
     }
 
     /**
-     * The browser's language, to offer a visitor who told us none (no account language, no answer yet) while the
-     * page is in another; else null. Offer it in its own language, posting it or the page's to localization.switch.
+     * The visitor's language (their account's, else their choice, else their browser's) while the page is in another;
+     * else null. Offer it in its own language, posting it or the page's to localization.switch: either answer is kept.
+     * Never on a signed page: its sender chose the language, and one that can't be signed again would come back as is.
      */
     public function suggestion(): ?Language
     {
@@ -58,17 +59,17 @@ class Localization
 
         if (
             $locales === null
-            || config('localization.remember_locale') === false
             || ! $request->hasSession()
-            || $this->accountLanguage() !== null
-            || ResolveLocale::stored($request, ResolveLocale::PICKED_KEY, $locales) !== null
+            || $request->query->has('signature')
             || ApplyLocale::isCrawler($request)
         ) {
             return null;
         }
 
-        $browser = $locales->preferredBy($request);
+        // The choice first: ApplyLocale copied in the account of the user it saw, the one POST /locale saves to, where
+        // a guard swapped later (impersonation) would offer a language no answer could store.
+        $theirs = ResolveLocale::stored($request, $locales) ?? $this->accountLanguage() ?? $locales->preferredBy($request);
 
-        return $browser === null || $browser === app()->getLocale() ? null : new Language($browser, false);
+        return $theirs === null || $theirs === app()->getLocale() ? null : new Language($theirs, false);
     }
 }

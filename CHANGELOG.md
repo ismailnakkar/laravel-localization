@@ -4,6 +4,31 @@ All notable changes are listed here, following [Keep a Changelog](https://keepac
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While 0.x, breaking changes bump the minor. Anything
 marked `@internal` may change in any release.
 
+## [0.3.0] - 2026-09-28
+
+To upgrade, make the [suggestion banner](https://github.com/ismailnakkar/laravel-localization#account-language)'s
+second button post the page's language as "Use <language>", remove `remember_locale` from `config/localization.php`,
+and drop references to `ResolveLocale::SESSION_KEY`.
+Members now see the banner too: don't render it while impersonating, where no answer is saved.
+
+### Changed
+
+- `Localization::suggestion()` offers the visitor's language (the account's, else their choice, else the browser's) to
+  members and guests whenever the page shows another, and either answer is kept.
+- Opening a copy no longer records a language: pages without one in the URL use the account's, the choice, else the
+  browser's.
+- The suggestion is never shown on a signed page.
+
+### Fixed
+
+- Typing `/en/…` no longer fills an empty account with the browser's language: the English page it lands on fills it.
+
+### Removed
+
+- `ResolveLocale::SESSION_KEY` (`localization.browsing`).
+- The `remember_locale` config key: with two or more locales, the session, account, switcher, entry redirect and
+  suggestion are always on. `localization:check` warns while it is set.
+
 ## [0.2.0] - 2026-09-28
 
 To upgrade, remove `entry_redirect` from `config/localization.php` and replace the account-language modal with the
@@ -42,5 +67,6 @@ Extracted from laravel-seo 0.4.2 under new names. To upgrade, follow its
 
 - The switcher no longer doubles the base path in apps served from a subdirectory (`/app/app/terms`).
 
+[0.3.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.1.0
