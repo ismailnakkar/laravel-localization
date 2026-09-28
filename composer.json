@@ -1,0 +1,74 @@
+{
+    "name": "ismailnakkar/laravel-localization",
+    "description": "Localized routes and per-visitor language for Laravel.",
+    "keywords": [
+        "laravel",
+        "localization",
+        "multilingual",
+        "i18n",
+        "locale",
+        "hreflang"
+    ],
+    "homepage": "https://github.com/ismailnakkar/laravel-localization",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Ismail Nakkar",
+            "email": "juge.steam@gmail.com"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/ismailnakkar/laravel-localization/issues"
+    },
+    "require": {
+        "php": "^8.4",
+        "jaybizzle/crawler-detect": "^1.3",
+        "laravel/framework": "^12.61.1 || ^13.12"
+    },
+    "require-dev": {
+        "fakerphp/faker": "^1.24",
+        "ismailnakkar/laravel-seo": "^0.5",
+        "larastan/larastan": "^3.12",
+        "laravel/pint": "^1.19",
+        "orchestra/testbench": "^10.0 || ^11.0",
+        "phpunit/phpunit": "^11.5 || ^12.0 || ^13.0",
+        "symfony/translation": "^6.4.3 || ^7.0 || ^8.0",
+        "symfony/translation-contracts": "^3.5"
+    },
+    "suggest": {
+        "ismailnakkar/laravel-seo": "Canonicals, hreflang and sitemap alternates for the localized routes, with no configuration."
+    },
+    "conflict": {
+        "ismailnakkar/laravel-seo": "<0.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "Localization\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Localization\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit",
+        "lint": "vendor/bin/pint",
+        "analyse": "vendor/bin/phpstan analyse --memory-limit=1G",
+        "check": [
+            "vendor/bin/pint --test",
+            "@analyse",
+            "@test"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Localization\\LocalizationServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

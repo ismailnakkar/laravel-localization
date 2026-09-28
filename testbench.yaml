@@ -1,0 +1,4 @@
+# route:cache tests shell out to vendor/bin/testbench, whose cached package manifest can miss these providers.
+providers:
+  - Seo\SeoServiceProvider
+  - Localization\LocalizationServiceProvider
