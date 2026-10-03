@@ -734,8 +734,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
 
     public function test_the_redirect_covers_every_localized_page_whatever_entry_redirect_lists(): void
     {
-        config(['localization.entry_redirect' => []]);
-
         $this->withSession([ResolveLocale::PICKED_KEY => 'fr'])->get('/terms')->assertRedirect('/fr/terms');
         $this->get('/')->assertRedirect('/fr');
     }

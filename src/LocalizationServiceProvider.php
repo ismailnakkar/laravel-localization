@@ -22,7 +22,7 @@ use Localization\Http\ResolveLocale;
 use LogicException;
 
 /** @internal */
-class LocalizationServiceProvider extends ServiceProvider
+final class LocalizationServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
@@ -75,12 +75,6 @@ class LocalizationServiceProvider extends ServiceProvider
             $locales = Locales::configured();
 
             if ($locales === null) {
-                $legacy = config('seo.locales');
-
-                if (is_array($legacy) && count($legacy) >= 2) {
-                    throw new LogicException("Route::localized(): move 'locales' and 'user_locale' from config/seo.php to config/localization.php.");
-                }
-
                 $this->group([], $routes);
 
                 return;

@@ -2,15 +2,21 @@
 
 Localized routes and per-visitor language for Laravel: `/terms` and `/fr/terms` from one route, a switcher, and, with
 [laravel-seo](https://github.com/ismailnakkar/laravel-seo) 0.5+, canonical, hreflang and sitemap entries per copy
-automatically. Requires PHP 8.4+ and Laravel 12.61.1+ or 13.12+. From laravel-seo 0.4? Follow its
+automatically. From laravel-seo 0.4? Follow its
 [UPGRADE.md](https://github.com/ismailnakkar/laravel-seo/blob/main/UPGRADE.md#from-04-to-05).
 
-## Usage
+## Requirements
+
+PHP 8.4+ and Laravel 12.61.1+ or 13.12+.
+
+## Install
 
 ```bash
 composer require ismailnakkar/laravel-localization
 php artisan vendor:publish --tag=localization-config
 ```
+
+## Usage
 
 Set `'locales' => ['en', 'fr', 'es']` (default first) in `config/localization.php` and wrap the translated pages:
 
@@ -120,8 +126,25 @@ Codes are ISO 639-1 plus an optional script and region, cased exactly (`en`, `en
 are refused, as Google ignores them in hreflang: use `es`, `tl`. A code is also the URL segment and app locale, so name
 translation folders after it (`lang/pt-BR/`, not `pt_BR`).
 
-`localization:check` exits 1 on any FAIL. Its rows: `leftover keys` (no laravel-seo 0.4 language keys left in
-`config/seo.php`), `entry_redirect` and `remember_locale` (WARN while these keys from older releases are still set),
-`user_locale` (the default guard's users table has the column; WARN when it can't check).
+`localization:check` exits 1 on any FAIL. Its one row, `user_locale`: the default guard's users table has the column (WARN
+when it can't check).
+
+## Building a language's path
+
+`Localization\LocalizedRoute::of($route)` is `null` outside `Route::localized()`, else the copy's marker. Its
+`path($path, $code)` turns this copy's path into `$code`'s: on the `fr` copy, `path('/fr/terms', 'en')` is `/terms`.
+
+## Testing
+
+Declare the languages in the test (`config(['localization.locales' => ['en', 'fr']])`) before the routes are
+registered, then request `/fr/terms` like any other URL; `route('terms')` follows `app()->getLocale()`.
+
+## Upgrading
+
+- 0.2: remove `entry_redirect` (every localized page now redirects to a known language) and move `locales` and
+  `user_locale` from `config/seo.php` to `config/localization.php`.
+- 0.3: remove `remember_locale` from `config/localization.php` (the language is always remembered), make the banner's
+  second button post the page's language, and drop references to `ResolveLocale::SESSION_KEY`.
+- 0.4: `localization:check` no longer warns about the keys above; left in a config they are ignored.
 
 [MIT licensed](LICENSE).

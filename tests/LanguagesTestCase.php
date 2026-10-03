@@ -23,7 +23,6 @@ abstract class LanguagesTestCase extends TestCase
 
         $app['config']->set('localization.locales', ['en', 'fr', 'ar', 'es']);
         $app['config']->set('localization.user_locale', 'locale');
-        $app['config']->set('localization.entry_redirect', ['home']);
         $app['config']->set('auth.providers.users.model', User::class);
     }
 

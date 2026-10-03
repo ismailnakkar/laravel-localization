@@ -4,6 +4,18 @@ All notable changes are listed here, following [Keep a Changelog](https://keepac
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While 0.x, breaking changes bump the minor. Anything
 marked `@internal` may change in any release.
 
+## [Unreleased]
+
+### Changed
+
+- `localization:check` only checks `user_locale` now: the warnings for `seo.locales`, `seo.user_locale`,
+  `entry_redirect` and `remember_locale` are gone, and `Route::localized()` no longer reads `config('seo.locales')`.
+- `LocalizationServiceProvider` is `final`; one crawler detector is shared instead of one built per call.
+
+### Added
+
+- README: Requirements, Install, Testing and Upgrading sections, and `LocalizedRoute::of()` / `path()` documented.
+
 ## [0.3.1] - 2026-09-28
 
 ### Added

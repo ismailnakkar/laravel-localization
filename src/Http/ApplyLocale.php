@@ -115,11 +115,12 @@ final class ApplyLocale
         return is_string($referer) && strcasecmp($referer, $request->getHost()) === 0;
     }
 
-    /** @internal Octane: pass this request's server values; the default constructor reads a stale $_SERVER. */
+    /** @internal One detector (its pattern lists are costly to build); the request's own agent, never a stale $_SERVER. */
     public static function isCrawler(Request $request): bool
     {
+        static $detector = new CrawlerDetect([], '');
         $userAgent = (string)$request->userAgent();
 
-        return $userAgent !== '' && new CrawlerDetect($request->server->all(), $userAgent)->isCrawler($userAgent);
+        return $userAgent !== '' && $detector->isCrawler($userAgent);
     }
 }
