@@ -8,9 +8,3 @@ parameters:
         - tests
     # Constructors re-check config values despite their PHPDoc types.
     treatPhpDocTypesAsCertain: false
-    ignoreErrors:
-        # Fixture views are added at runtime; Larastan can't see them.
-        -
-            identifier: argument.type
-            message: '#view-string#'
-            path: tests/*

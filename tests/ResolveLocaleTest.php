@@ -275,11 +275,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertSame('ar', session(ResolveLocale::PICKED_KEY));
     }
 
-    public function test_a_laravel_seo_0_3_sessions_language_is_forgotten(): void
-    {
-        $this->withSession(['seo.locale' => 'fr'])->withHeaders(['Accept-Language' => 'es'])->get('/plain')->assertContent('es');
-    }
-
     public function test_an_enum_cast_account_language_counts(): void
     {
         $user = User::create(['name' => 'member', 'locale' => 'fr']);

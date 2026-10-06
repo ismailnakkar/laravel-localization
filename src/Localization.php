@@ -20,7 +20,7 @@ class Localization
         $this->userLocaleSaver = $save;
     }
 
-    /** @return list<Language> In config order; [] when fewer than two are configured. */
+    /** @return list<Language> In config order; [] when fewer than two are configured, so no route has copies. */
     public function languages(): array
     {
         $locales = Locales::configured();

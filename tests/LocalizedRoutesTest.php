@@ -6,8 +6,8 @@ namespace Localization\Tests;
 
 use Closure;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Route as RoutingRoute;
-use Illuminate\Routing\RouteCollection;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 use Localization\Locales;
@@ -17,7 +17,6 @@ use Localization\Tests\Fixtures\EarlierListenerProvider;
 use Localization\Tests\Fixtures\LocalizedController;
 use Localization\Tests\Fixtures\NegotiateLocale;
 use LogicException;
-use Orchestra\Testbench\Attributes\DefineEnvironment;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 final class LocalizedRoutesTest extends TestCase
@@ -29,8 +28,6 @@ final class LocalizedRoutesTest extends TestCase
 
     public function test_the_default_keeps_its_uris_and_names_and_every_other_code_gets_a_prefixed_copy(): void
     {
-        // Else the default '/' copy inherits the fixture '/' route's early slot.
-        Route::setRoutes(new RouteCollection);
         $locales = new Locales(['en', 'fr', 'zh-Hant'], 'en');
         $this->withLocalizedRoutes($locales->codes, static function (): void {
             Route::get('/', static fn () => 'home')->name('home');
@@ -100,12 +97,12 @@ final class LocalizedRoutesTest extends TestCase
         Route::localized($routes);
     }
 
-    public function test_a_laravel_seo_0_2_call_passing_locales_says_how_to_upgrade(): void
+    public function test_an_old_call_passing_locales_says_how_to_upgrade(): void
     {
         $this->expectException(LogicException::class);
         $this->expectExceptionMessage("Route::localized() takes only the routes closure: set the languages in config('localization.locales') as a list of codes, default first.");
 
-        // @phpstan-ignore arguments.count (laravel-seo 0.2's call, on purpose)
+        // @phpstan-ignore arguments.count (the 0.2 call, on purpose)
         Route::localized(new Locales(['en', 'fr'], 'en'), static fn () => null);
     }
 
@@ -129,6 +126,20 @@ final class LocalizedRoutesTest extends TestCase
         new LocalizedRoute(new Locales(['en', 'fr'], 'en'), 'fr')->path('/frx/terms', 'en');
     }
 
+    public function test_copies_gives_the_copys_own_path_and_every_codes_in_order_and_null_off_route_localized(): void
+    {
+        $this->withLocalizedRoutes(['en', 'fr', 'ar'], static function (): void {
+            Route::get('/', static fn () => 'home');
+            Route::get('faq', static fn () => 'faq');
+        });
+        Route::get('plain', static fn () => 'plain');
+
+        $this->assertSame(['path' => '/fr/faq', 'alternates' => ['en' => '/faq', 'fr' => '/fr/faq', 'ar' => '/ar/faq']], $this->copies('/fr/faq'));
+        $this->assertSame(['path' => '/ar/faq', 'alternates' => ['en' => '/faq', 'fr' => '/fr/faq', 'ar' => '/ar/faq']], $this->copies('/%61r/faq'));
+        $this->assertSame(['path' => '/', 'alternates' => ['en' => '/', 'fr' => '/fr', 'ar' => '/ar']], $this->copies('/'));
+        $this->assertNull($this->copies('/plain'));
+    }
+
     public function test_the_default_copy_never_gets_a_path_a_browser_reads_as_another_host(): void
     {
         $fr = new LocalizedRoute(new Locales(['en', 'fr', 'ar'], 'en'), 'fr');
@@ -138,10 +149,8 @@ final class LocalizedRoutesTest extends TestCase
         $this->assertSame('/ar//evil.test/x', $fr->path('/fr//evil.test/x', 'ar'));
     }
 
-    #[DefineEnvironment('withLanguagesAtBoot')]
     public function test_a_default_route_opening_with_a_parameter_never_catches_another_codes_urls(): void
     {
-        $this->withSite();
         $this->withLocalizedRoutes(['en', 'fr'], static function (): void {
             Route::get('/', static fn () => 'home:' . app()->getLocale());
             Route::get('terms', static fn () => 'terms:' . app()->getLocale());
@@ -167,9 +176,6 @@ final class LocalizedRoutesTest extends TestCase
         $this->get('/en')->assertStatus(301)->assertHeader('Location', 'http://localhost');
         $this->get('/en/about')->assertStatus(301)->assertHeader('Location', 'http://localhost/about');
         $this->get('/en/a/b/c')->assertOk()->assertContent('fallback:en');
-
-        $this->withSitemap(['/fr']);
-        $this->assertSame(['http://localhost/', 'http://localhost/fr'], $this->locs());
     }
 
     public function test_the_defaults_prefix_answers_301_to_each_pages_default_copy(): void
@@ -220,7 +226,6 @@ final class LocalizedRoutesTest extends TestCase
 
     public function test_it_is_fine_inside_domain_name_and_middleware_groups(): void
     {
-        $this->withSite();
         config(['localization.locales' => ['en', 'fr']]);
         Route::domain('localhost')->name('site.')->middleware('web')->group(static function (): void {
             Route::localized(static function (): void {
@@ -429,6 +434,12 @@ final class LocalizedRoutesTest extends TestCase
         $this->app->setLocale('en');
         $this->assertSame('http://localhost/terms', route('terms'));
         $this->assertSame('http://localhost/terms', route('localization.ar.terms'));
+    }
+
+    /** @return array{path: string, alternates: array<string, string>}|null */
+    private function copies(string $path): ?array
+    {
+        return LocalizedRoute::copies(Route::getRoutes()->match(Request::create($path)), $path);
     }
 
     /** @return array<string, string|null> uri => name, in registration order */

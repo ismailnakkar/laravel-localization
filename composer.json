@@ -27,7 +27,6 @@
     },
     "require-dev": {
         "fakerphp/faker": "^1.24",
-        "ismailnakkar/laravel-seo": "^0.5",
         "larastan/larastan": "^3.12",
         "laravel/pint": "^1.19",
         "orchestra/testbench": "^10.0 || ^11.0",
@@ -35,11 +34,8 @@
         "symfony/translation": "^6.4.3 || ^7.0 || ^8.0",
         "symfony/translation-contracts": "^3.5"
     },
-    "suggest": {
-        "ismailnakkar/laravel-seo": "Canonicals, hreflang and sitemap alternates for the localized routes, with no configuration."
-    },
     "conflict": {
-        "ismailnakkar/laravel-seo": "<0.5"
+        "ismailnakkar/laravel-seo": "<0.6"
     },
     "autoload": {
         "psr-4": {

@@ -65,7 +65,7 @@ final class LocalizationServiceProvider extends ServiceProvider
             $this->loadRoutesFrom(__DIR__ . '/../routes/locale.php');
         }
 
-        // mixed, not Closure: a laravel-seo 0.2 call gets the upgrade message, not a TypeError.
+        // mixed, not Closure: an old call passing the languages first gets the upgrade message, not a TypeError.
         Router::macro('localized', function (mixed $routes): void {
             if (! $routes instanceof Closure) {
                 throw new LogicException("Route::localized() takes only the routes closure: set the languages in config('localization.locales') as a list of codes, default first.");
@@ -135,8 +135,6 @@ final class LocalizationServiceProvider extends ServiceProvider
                 }
             }
         });
-
-        SeoAlternates::register($this->app);
 
         $this->callAfterResolving('url', static function (UrlGenerator $url): void {
             $previous = $url->pathFormatter();

@@ -28,7 +28,7 @@ final class ConfigTest extends TestCase
     {
         yield 'a duplicate code' => [['en', 'fr', 'en'], 'localization.locales: [en] is listed twice.'];
         yield 'a malformed code' => [['en', 'EN_us'], '[EN_us] is not an hreflang code'];
-        yield "laravel-seo 0.3.0's code => name" => [['fr' => 'Français', 'en' => ''], 'list the codes only'];
+        yield 'a code => name map' => [['fr' => 'Français', 'en' => ''], 'list the codes only'];
         yield 'a code that is not a string' => [['en', 1], "localization.locales: list the codes only, default first, e.g. ['en', 'fr']; label them with your own translations."];
         yield 'codes and names mixed' => [['en', 'fr' => 'Français'], "localization.locales: list the codes only, default first, e.g. ['en', 'fr']; label them with your own translations."];
         yield 'not a list' => ['en,fr', "localization.locales: list the codes only, default first, e.g. ['en', 'fr']; label them with your own translations."];

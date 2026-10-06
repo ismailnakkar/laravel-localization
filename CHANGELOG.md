@@ -4,7 +4,26 @@ All notable changes are listed here, following [Keep a Changelog](https://keepac
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While 0.x, breaking changes bump the minor. Anything
 marked `@internal` may change in any release.
 
-## [Unreleased]
+## [0.5.0] - 2026-10-06
+
+With laravel-seo installed, update it to 0.6 in the same `composer update`: it now reads the copies itself.
+
+### Added
+
+- `LocalizedRoute::copies($route, $path)`: every language's path for one a localized route matched,
+  `['path' => …, 'alternates' => [code => path]]` in config order; `null` outside `Route::localized()`.
+
+### Changed
+
+- Installed beside laravel-seo, Composer refuses laravel-seo before 0.6, which would silently lose the copies' hreflang
+  and sitemap entries.
+
+### Removed
+
+- The laravel-seo bridge (`SeoAlternates`, `@internal`): laravel-seo 0.6 picks the copies up itself. laravel-seo is no
+  longer suggested or needed by the tests.
+
+## [0.4.0] - 2026-10-03
 
 ### Changed
 
@@ -86,6 +105,8 @@ Extracted from laravel-seo 0.4.2 under new names. To upgrade, follow its
 
 - The switcher no longer doubles the base path in apps served from a subdirectory (`/app/app/terms`).
 
+[0.5.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.5.0
+[0.4.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.4.0
 [0.3.1]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.2.0

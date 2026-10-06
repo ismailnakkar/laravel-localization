@@ -25,6 +25,31 @@ final readonly class LocalizedRoute
     }
 
     /**
+     * Every language's copy of $path, a path $route matched: this copy's, then each code's in config order, default
+     * first. On the fr copy, '/fr/terms' (or '/%66r/terms') → ['path' => '/fr/terms', 'alternates' =>
+     * ['en' => '/terms', 'fr' => '/fr/terms']]. null outside Route::localized().
+     *
+     * @return array{path: string, alternates: array<string, string>}|null
+     *
+     * @throws LogicException
+     */
+    public static function copies(Route $route, string $path): ?array
+    {
+        $localized = self::of($route);
+
+        if ($localized === null) {
+            return null;
+        }
+
+        $codes = $localized->locales->codes;
+
+        return [
+            'path'       => $localized->path($path, $localized->locale),
+            'alternates' => array_combine($codes, array_map(static fn (string $code): string => $localized->path($path, $code), $codes)),
+        ];
+    }
+
+    /**
      * This copy's $path as $code's: on the fr copy, '/fr/terms' → '/terms' (default en), '/ar/terms' (ar).
      *
      * @throws LogicException

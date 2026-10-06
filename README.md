@@ -1,9 +1,6 @@
 # Laravel Localization
 
-Localized routes and per-visitor language for Laravel: `/terms` and `/fr/terms` from one route, a switcher, and, with
-[laravel-seo](https://github.com/ismailnakkar/laravel-seo) 0.5+, canonical, hreflang and sitemap entries per copy
-automatically. From laravel-seo 0.4? Follow its
-[UPGRADE.md](https://github.com/ismailnakkar/laravel-seo/blob/main/UPGRADE.md#from-04-to-05).
+Localized routes and per-visitor language for Laravel: `/terms` and `/fr/terms` from one route, and a switcher.
 
 ## Requirements
 
@@ -31,8 +28,7 @@ Render `<html lang="{{ app()->getLocale() }}">`, add [the switcher](#language) a
 
 - Call `Route::localized()` outside prefix groups, before catch-all and fallback routes. Inside, prefix with
   `Route::prefix()->group()`, never a route-level `->prefix()`.
-- Only put pages translated into every language (and their forms' POST routes) inside: every copy is listed in hreflang
-  and the sitemap.
+- Only put pages translated into every language (and their forms' POST routes) inside: each gets a copy per language.
 - Link with `route()`; `url()` and hard-coded paths lead to the default language.
 - On `/fr/terms`, `Route::currentRouteName()` and `routeIs()` see `terms`; `route:list` shows `localization.fr.terms`.
 - With `en` the default, `/en/…` 301s to the bare URL only for localized GET pages; other `/en/…` paths fall through to
@@ -133,6 +129,10 @@ when it can't check).
 
 `Localization\LocalizedRoute::of($route)` is `null` outside `Route::localized()`, else the copy's marker. Its
 `path($path, $code)` turns this copy's path into `$code`'s: on the `fr` copy, `path('/fr/terms', 'en')` is `/terms`.
+
+`LocalizedRoute::copies($route, $path)` gives them all at once, or `null` outside `Route::localized()`: on the `fr`
+copy, `copies($route, '/fr/terms')` is `['path' => '/fr/terms', 'alternates' => ['en' => '/terms', 'fr' => '/fr/terms']]`,
+in config order. No route has copies while `$localization->languages()` is `[]`.
 
 ## Testing
 
