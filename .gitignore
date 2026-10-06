@@ -6,3 +6,4 @@ composer.lock
 /docs
 /phpunit.xml
 /phpstan.neon
+/.superpowers
