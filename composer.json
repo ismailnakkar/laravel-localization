@@ -34,9 +34,6 @@
         "symfony/translation": "^6.4.3 || ^7.0 || ^8.0",
         "symfony/translation-contracts": "^3.5"
     },
-    "conflict": {
-        "ismailnakkar/laravel-seo": "<0.6"
-    },
     "autoload": {
         "psr-4": {
             "Localization\\": "src/"

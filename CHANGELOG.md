@@ -4,6 +4,15 @@ All notable changes are listed here, following [Keep a Changelog](https://keepac
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While 0.x, breaking changes bump the minor. Anything
 marked `@internal` may change in any release.
 
+## [0.5.1] - 2026-10-06
+
+0.5.0's upgrade line is withdrawn: nothing picks the copies up by itself. An app passes `LocalizedRoute::copies(...)`
+to its SEO package's alternates hook with one line.
+
+### Removed
+
+- The Composer `conflict` added in 0.5.0: no other package's version is refused.
+
 ## [0.5.0] - 2026-10-06
 
 With laravel-seo installed, update it to 0.6 in the same `composer update`: it now reads the copies itself.
@@ -105,6 +114,7 @@ Extracted from laravel-seo 0.4.2 under new names. To upgrade, follow its
 
 - The switcher no longer doubles the base path in apps served from a subdirectory (`/app/app/terms`).
 
+[0.5.1]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.5.1
 [0.5.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.5.0
 [0.4.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.4.0
 [0.3.1]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.3.1
