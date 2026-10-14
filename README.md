@@ -134,6 +134,9 @@ when it can't check).
 copy, `copies($route, '/fr/terms')` is `['path' => '/fr/terms', 'alternates' => ['en' => '/terms', 'fr' => '/fr/terms']]`,
 in config order. No route has copies while `$localization->languages()` is `[]`.
 
+With laravel-seo, add `$seo->alternatesUsing(\Localization\LocalizedRoute::copies(...))` to a service provider's
+`boot(\Seo\Seo $seo)`, or the copies get no hreflang links and the sitemap lists only the paths you give it.
+
 ## Testing
 
 Declare the languages in the test (`config(['localization.locales' => ['en', 'fr']])`) before the routes are
@@ -141,10 +144,18 @@ registered, then request `/fr/terms` like any other URL; `route('terms')` follow
 
 ## Upgrading
 
-- 0.2: remove `entry_redirect` (every localized page now redirects to a known language) and move `locales` and
-  `user_locale` from `config/seo.php` to `config/localization.php`.
-- 0.3: remove `remember_locale` from `config/localization.php` (the language is always remembered), make the banner's
-  second button post the page's language, and drop references to `ResolveLocale::SESSION_KEY`.
-- 0.4: `localization:check` no longer warns about the keys above; left in a config they are ignored.
+### From 0.4
+
+- With laravel-seo, add the [`alternatesUsing()` line](#building-a-languages-path).
+
+### From 0.2
+
+- Remove `remember_locale` from `config/localization.php`, make the banner's second button post the page's language,
+  drop references to `ResolveLocale::SESSION_KEY`, and don't render the suggestion while impersonating.
+
+### From 0.1
+
+- Remove `entry_redirect` from `config/localization.php` and replace the `accountLanguageOffer()` modal with the
+  [suggestion banner](#account-language).
 
 [MIT licensed](LICENSE).
