@@ -41,7 +41,11 @@ jobs:
       # Only Testbench pins Laravel, so prefer-lowest installs composer.json's floors.
       - run: composer require "orchestra/testbench:${{ matrix.testbench }}" --dev --no-interaction --no-update
 
+      # The lowest legs install the declared Laravel 12.61.1 and 13.12 floors, which have security advisories; malware
+      # and abandoned-package blocking stay on.
       - run: composer update --${{ matrix.deps }} --prefer-dist --no-interaction --no-progress
+        env:
+          COMPOSER_POLICY_ADVISORIES_BLOCK: ${{ matrix.deps == 'prefer-lowest' && '0' || '1' }}
 
       - if: matrix.php == '8.5' && matrix.deps == 'prefer-stable' && matrix.laravel == '13.*'
         run: vendor/bin/pint --test
