@@ -50,18 +50,19 @@ final class LocalizationServiceProvider extends ServiceProvider
     {
         $this->publishes([__DIR__ . '/../config/localization.php' => $this->app->configPath('localization.php')], 'localization-config');
 
-        if (Locales::configured() !== null) {
-            // ResolveLocale after StartSession, so CSRF and auth refusals are translated.
-            // ApplyLocale after AuthenticateSession, as it reads the user.
-            $this->callAfterResolving(Kernel::class, static function (HttpKernel $kernel): void {
-                if (array_key_exists('web', $kernel->getMiddlewareGroups())) {
-                    $kernel->appendMiddlewareToGroup('web', ResolveLocale::class)
-                        ->appendMiddlewareToGroup('web', ApplyLocale::class)
-                        ->addToMiddlewarePriorityAfter(StartSession::class, ResolveLocale::class)
-                        ->addToMiddlewarePriorityAfter(AuthenticatesSessions::class, ApplyLocale::class);
-                }
-            });
+        // ResolveLocale after StartSession, so CSRF and auth refusals are translated.
+        // ApplyLocale after AuthenticateSession, as it reads the user.
+        // On every boot: both read the config per request, so languages set after boot still apply.
+        $this->callAfterResolving(Kernel::class, static function (HttpKernel $kernel): void {
+            if (array_key_exists('web', $kernel->getMiddlewareGroups())) {
+                $kernel->appendMiddlewareToGroup('web', ResolveLocale::class)
+                    ->appendMiddlewareToGroup('web', ApplyLocale::class)
+                    ->addToMiddlewarePriorityAfter(StartSession::class, ResolveLocale::class)
+                    ->addToMiddlewarePriorityAfter(AuthenticatesSessions::class, ApplyLocale::class);
+            }
+        });
 
+        if (Locales::configured() !== null) {
             $this->loadRoutesFrom(__DIR__ . '/../routes/locale.php');
         }
 

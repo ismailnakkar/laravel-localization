@@ -101,7 +101,7 @@ Don't render the suggestion while impersonating either: no answer is saved, so i
 
 ## Middleware
 
-With two or more `locales`, `ResolveLocale` (right after `StartSession`, so CSRF and throttle
+`ResolveLocale` (right after `StartSession`, so CSRF and throttle
 errors are translated) and `ApplyLocale` (right after `\Illuminate\Contracts\Session\Middleware\AuthenticatesSessions`,
 as it reads the user) join `web`. `ApplyLocale` must run after your session check:
 

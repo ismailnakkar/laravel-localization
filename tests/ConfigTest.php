@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace Localization\Tests;
 
-use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
-use Localization\Http\ApplyLocale;
-use Localization\Http\ResolveLocale;
 use Localization\Locales;
 use Localization\LocalizationServiceProvider;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -67,13 +64,20 @@ final class ConfigTest extends TestCase
         $this->assertEquals(new Locales(['fr', 'en'], 'fr'), Locales::configured());
     }
 
-    public function test_one_language_registers_no_middleware_and_no_switch_route(): void
+    public function test_one_language_registers_no_switch_route(): void
     {
-        $kernel = $this->app->make(Kernel::class);
-
-        $this->assertNotContains(ResolveLocale::class, $kernel->getMiddlewareGroups()['web']);
-        $this->assertNotContains(ApplyLocale::class, $kernel->getMiddlewareGroups()['web']);
         $this->assertFalse(Route::has('localization.switch'));
+    }
+
+    public function test_web_passes_through_below_two_languages_and_follows_languages_set_after_boot(): void
+    {
+        Route::middleware('web')->get('plain', static fn (): string => app()->getLocale());
+
+        $this->withHeaders(['Accept-Language' => 'fr'])->get('/plain')->assertOk()->assertContent('en');
+
+        config(['localization.locales' => ['en', 'fr']]);
+
+        $this->withHeaders(['Accept-Language' => 'fr'])->get('/plain')->assertOk()->assertContent('fr');
     }
 
     public function test_one_language_lists_none_and_offers_none(): void

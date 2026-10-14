@@ -4,6 +4,13 @@ All notable changes are listed here, following [Keep a Changelog](https://keepac
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While 0.x, breaking changes bump the minor. Anything
 marked `@internal` may change in any release.
 
+## [0.5.3] - 2026-10-14
+
+### Fixed
+
+- `ResolveLocale` and `ApplyLocale` join `web` on every boot and read `locales` per request, so languages set after
+  boot (a test's `config()`) apply; with fewer than two they pass through.
+
 ## [0.5.2] - 2026-10-14
 
 ### Added
@@ -121,6 +128,7 @@ Extracted from laravel-seo 0.4.2 under new names. To upgrade, follow its
 
 - The switcher no longer doubles the base path in apps served from a subdirectory (`/app/app/terms`).
 
+[0.5.3]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.5.3
 [0.5.2]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.5.2
 [0.5.1]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.5.1
 [0.5.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.5.0
