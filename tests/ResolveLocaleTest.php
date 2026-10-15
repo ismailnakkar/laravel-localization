@@ -571,29 +571,53 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertSame($after, $member->fresh()?->locale);
     }
 
-    /** @return iterable<string, array{array<string, string>}> the sign-in's headers */
-    public static function signInsOnACopy(): iterable
-    {
-        yield 'a form' => [[]];
-        yield 'a Livewire update replaying the copy' => [['Sec-Fetch-Site' => 'same-origin', 'Sec-Fetch-Dest' => 'empty', 'X-Livewire' => '1']];
-    }
-
-    /**
-     * The page after sign-in is unprefixed and would take the browser's language: the sign-in on the copy fills first.
-     *
-     * @param  array<string, string>  $headers
-     */
-    #[DataProvider('signInsOnACopy')]
-    public function test_signing_in_on_a_copy_fills_an_empty_account_with_it_and_the_next_page_keeps_it(array $headers): void
+    /** The page after sign-in is unprefixed and would take the browser's language: the sign-in on the copy fills first. */
+    public function test_signing_in_on_a_copy_fills_an_empty_account_with_it_and_the_next_page_keeps_it(): void
     {
         $member = User::create(['name' => 'member', 'locale' => null]);
         $this->withHeaders(['Accept-Language' => 'en']);
 
-        $this->post('/fr/sign-in', [], $headers)->assertOk()->assertContent('fr');
+        $this->post('/fr/sign-in')->assertOk()->assertContent('fr');
         $this->assertSame('fr', User::query()->value('locale'));
 
         $this->get('/members')->assertOk()->assertContent('fr');
         $this->assertSame('fr', $member->fresh()?->locale);
+    }
+
+    /** The bare copy shows the default to anyone without a choice: the page it lands on fills, as off a copy. */
+    public function test_signing_in_on_the_default_copy_leaves_the_fill_to_the_page_it_lands_on(): void
+    {
+        $member = User::create(['name' => 'member', 'locale' => null]);
+        $this->withHeaders(['Accept-Language' => 'es']);
+
+        $this->post('/sign-in')->assertOk()->assertContent('en');
+        $this->assertNull($member->fresh()?->locale);
+
+        $this->get('/members')->assertOk()->assertContent('es');
+        $this->assertSame('es', $member->fresh()?->locale);
+    }
+
+    /** A cross-site POST (an identity provider's form_post) carries no SameSite=Lax choice: the page it lands on fills. */
+    public function test_a_cross_site_sign_in_off_a_copy_leaves_the_fill_to_the_page_it_lands_on(): void
+    {
+        $member = User::create(['name' => 'member', 'locale' => null]);
+        $this->withHeaders(['Accept-Language' => 'en']);
+
+        $this->post('/members/sign-in', [], ['Sec-Fetch-Site' => 'cross-site', 'Sec-Fetch-Dest' => 'document'])->assertOk();
+        $this->assertNull($member->fresh()?->locale);
+
+        $this->withCookie(ResolveLocale::COOKIE, 'fr')->get('/members')->assertOk()->assertContent('fr');
+        $this->assertSame('fr', $member->fresh()?->locale);
+    }
+
+    /** A job or the console shows no page: nothing resolved the visitor's language. */
+    public function test_a_sign_in_outside_a_request_fills_nothing(): void
+    {
+        $member = User::create(['name' => 'member', 'locale' => null]);
+
+        Auth::login($member);
+
+        $this->assertNull($member->fresh()?->locale);
     }
 
     /** A restore shows nothing yet: the bare copy from outside still opens in the visitor's choice. */

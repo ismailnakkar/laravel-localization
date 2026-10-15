@@ -4,6 +4,15 @@ All notable changes are listed here, following [Keep a Changelog](https://keepac
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While 0.x, breaking changes bump the minor. Anything
 marked `@internal` may change in any release.
 
+## [0.6.2] - 2026-10-15
+
+### Fixed
+
+- Only a sign-in on a non-default copy (`/fr/login`) fills an empty account. Elsewhere the sign-in saved the default
+  language (on the bare copy), or the browser's or the app's default over the visitor's choice (a cross-site POST
+  such as an identity provider's form_post, a route outside `web`, a job or the console). The page it lands on
+  fills those again, as before 0.6.1.
+
 ## [0.6.1] - 2026-10-15
 
 ### Fixed
@@ -148,6 +157,7 @@ Extracted from laravel-seo 0.4.2 under new names. To upgrade, follow its
 
 - The switcher no longer doubles the base path in apps served from a subdirectory (`/app/app/terms`).
 
+[0.6.2]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.6.2
 [0.6.1]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.6.1
 [0.6.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.6.0
 [0.5.3]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.5.3
