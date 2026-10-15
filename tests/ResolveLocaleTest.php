@@ -85,6 +85,14 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $router->get('recent', $locale)->middleware(RequireRecentSignIn::class);
         $router->get('as/{member}', $loginAs);
         $router->get('sessionless', $locale)->withoutMiddleware($sessionless);
+        $router->post('sign-out', static function (Request $request): void {
+            Auth::logout();
+            $request->session()->invalidate();
+        });
+        $router->post('sign-out-here', static function (Request $request): void {
+            Auth::logoutCurrentDevice();
+            $request->session()->invalidate();
+        });
     }
 
     public function test_the_choice_runs_straight_after_the_session_and_the_account_straight_after_authenticate_session(): void
@@ -293,6 +301,31 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->withSession([ResolveLocale::PICKED_KEY => 'ar'])->get('/plain')->assertContent('ar');
         $this->flushSession();
         $this->withCookie(ResolveLocale::COOKIE, 'de')->get('/plain')->assertContent('es');
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function signOuts(): iterable
+    {
+        yield 'everywhere' => ['/sign-out'];
+        yield 'this device only' => ['/sign-out-here'];
+    }
+
+    /** The session that held the account's language ends; the cookie keeps it, as a guest's choice is kept. */
+    #[DataProvider('signOuts')]
+    public function test_signing_out_keeps_the_accounts_language_in_the_choice_cookie(string $uri): void
+    {
+        $member = User::create(['name' => 'member', 'locale' => 'ar']);
+
+        $this->actingAs($member)->withCookie(ResolveLocale::COOKIE, 'es')->post($uri)->assertOk()->assertCookie(ResolveLocale::COOKIE, 'ar');
+        $this->assertGuest();
+    }
+
+    public function test_signing_out_without_an_account_language_leaves_the_cookie_alone(): void
+    {
+        $member = User::create(['name' => 'member']);
+
+        $this->actingAs($member)->withCookie(ResolveLocale::COOKIE, 'es')->post('/sign-out')->assertOk()->assertCookieMissing(ResolveLocale::COOKIE);
+        $this->post('/sign-out')->assertOk()->assertCookieMissing(ResolveLocale::COOKIE);
     }
 
     public function test_a_pick_beats_the_browser(): void

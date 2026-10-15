@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace Localization;
 
 use BackedEnum;
+use Illuminate\Auth\Events\CurrentDeviceLogout;
+use Illuminate\Auth\Events\Logout;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cookie;
+use Localization\Http\ResolveLocale;
 
 /** @internal */
 final class UserLocale
@@ -61,6 +65,17 @@ final class UserLocale
         }
 
         $user->syncOriginalAttribute($column);
+    }
+
+    /** Signing out ends the session that held the account's language: the cookie keeps it, as it keeps a choice. */
+    public static function keepAfterSignOut(Logout|CurrentDeviceLogout $event): void
+    {
+        $locales = Locales::configured();
+        $code = $locales === null ? null : self::of($event->user, $locales);
+
+        if ($code !== null) {
+            Cookie::queue(ResolveLocale::remember($code));
+        }
     }
 
     public static function column(): ?string

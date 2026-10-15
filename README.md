@@ -69,7 +69,8 @@ that language. A signed page is re-signed only if its route is named and its sig
 
 Set `user_locale` to your users' language column. A member's account language outranks the session, and the switcher
 saves it; an account without one gets the language on screen once (a value outside `locales` counts as none and is overwritten);
-models without the column are skipped. Implement `HasLocalePreference` returning that column so mail uses it.
+models without the column are skipped. Signing out (Laravel's `Logout` or `CurrentDeviceLogout`) copies it into the
+`localization` cookie, so the guest keeps it. Implement `HasLocalePreference` returning that column so mail uses it.
 
 Anyone, members too, whose language differs from the page's gets a suggestion. Render this in your layout (not error
 views); either answer is kept like a switcher choice, so the banner goes:
@@ -143,6 +144,10 @@ Declare the languages in the test (`config(['localization.locales' => ['en', 'fr
 registered, then request `/fr/terms` like any other URL; `route('terms')` follows `app()->getLocale()`.
 
 ## Upgrading
+
+### From 0.5
+
+- Define a `web` middleware group (every `withMiddleware()` app has one): without it, booting the HTTP kernel throws.
 
 ### From 0.4
 

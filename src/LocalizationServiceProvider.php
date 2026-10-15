@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Localization;
 
 use Closure;
+use Illuminate\Auth\Events\CurrentDeviceLogout;
+use Illuminate\Auth\Events\Logout;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Contracts\Session\Middleware\AuthenticatesSessions;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
@@ -14,6 +16,7 @@ use Illuminate\Routing\Router;
 use Illuminate\Routing\UrlGenerator;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Localization\Console\CheckCommand;
 use Localization\Http\ApplyLocale;
@@ -53,14 +56,15 @@ final class LocalizationServiceProvider extends ServiceProvider
         // ResolveLocale after StartSession, so CSRF and auth refusals are translated.
         // ApplyLocale after AuthenticateSession, as it reads the user.
         // On every boot: both read the config per request, so languages set after boot still apply.
+        // No `web` group: the Kernel throws, as the README promises both join it.
         $this->callAfterResolving(Kernel::class, static function (HttpKernel $kernel): void {
-            if (array_key_exists('web', $kernel->getMiddlewareGroups())) {
-                $kernel->appendMiddlewareToGroup('web', ResolveLocale::class)
-                    ->appendMiddlewareToGroup('web', ApplyLocale::class)
-                    ->addToMiddlewarePriorityAfter(StartSession::class, ResolveLocale::class)
-                    ->addToMiddlewarePriorityAfter(AuthenticatesSessions::class, ApplyLocale::class);
-            }
+            $kernel->appendMiddlewareToGroup('web', ResolveLocale::class)
+                ->appendMiddlewareToGroup('web', ApplyLocale::class)
+                ->addToMiddlewarePriorityAfter(StartSession::class, ResolveLocale::class)
+                ->addToMiddlewarePriorityAfter(AuthenticatesSessions::class, ApplyLocale::class);
         });
+
+        Event::listen([Logout::class, CurrentDeviceLogout::class], [UserLocale::class, 'keepAfterSignOut']);
 
         if (Locales::configured() !== null) {
             $this->loadRoutesFrom(__DIR__ . '/../routes/locale.php');

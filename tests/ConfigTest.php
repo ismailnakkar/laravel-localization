@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace Localization\Tests;
 
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
 use Localization\Locales;
 use Localization\LocalizationServiceProvider;
+use Orchestra\Testbench\Attributes\DefineEnvironment;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 final class ConfigTest extends TestCase
@@ -78,6 +82,20 @@ final class ConfigTest extends TestCase
         config(['localization.locales' => ['en', 'fr']]);
 
         $this->withHeaders(['Accept-Language' => 'fr'])->get('/plain')->assertOk()->assertContent('fr');
+    }
+
+    protected function withoutWebGroup(Application $app): void
+    {
+        $app->afterResolving(Kernel::class, static fn (HttpKernel $kernel) => $kernel->setMiddlewareGroups(['api' => []]));
+    }
+
+    #[DefineEnvironment('withoutWebGroup')]
+    public function test_an_app_without_a_web_group_is_told_instead_of_losing_the_middleware(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The [web] middleware group has not been defined.');
+
+        $this->app->make(Kernel::class);
     }
 
     public function test_one_language_lists_none_and_offers_none(): void

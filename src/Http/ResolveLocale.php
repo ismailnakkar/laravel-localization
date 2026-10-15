@@ -8,6 +8,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Localization\Locales;
 use Localization\LocalizedRoute;
+use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Response;
 
 /** Never read the user: it would sign in a remember-me cookie before AuthenticateSession checks it. */
@@ -16,7 +17,7 @@ final class ResolveLocale
     /** The visitor's choice (the switcher, a suggestion's answer), or a member's account copied in. Nothing else. */
     public const string PICKED_KEY = 'localization.picked';
 
-    /** The same choice for a year, so a guest keeps it past the session: set only by localization.switch. */
+    /** The same choice for a year, so a guest keeps it past the session: set by localization.switch and by signing out. */
     public const string COOKIE = 'localization';
 
     public function handle(Request $request, Closure $next): Response
@@ -36,6 +37,12 @@ final class ResolveLocale
     public static function choice(Request $request, Locales $locales, ?string $account = null): string
     {
         return $account ?? self::stored($request, $locales) ?? $locales->preferredBy($request) ?? $locales->default;
+    }
+
+    /** @internal The cookie that keeps $code past the session. */
+    public static function remember(string $code): Cookie
+    {
+        return cookie(self::COOKIE, $code, 60 * 24 * 365);
     }
 
     /** @internal The visitor's choice, from the session else the cookie, if still configured. */
