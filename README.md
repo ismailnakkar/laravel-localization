@@ -117,12 +117,17 @@ as it reads the user) join `web`. `ApplyLocale` must run after your session chec
 
 | Key | Default | |
 |---|---|---|
-| `locales` | `[]` | Language codes, default first. Fewer than two turns everything off. |
+| `locales` | `[]` | Language codes, default first. Fewer than two turns everything but `numbers` off. |
 | `user_locale` | `null` | The users table's language column. `null`: session only. |
+| `numbers` | `null` | An ICU numbering system for Laravel's `Number`, e.g. `'latn'`. `null`: `Number` untouched. |
 
 Codes are ISO 639-1 plus an optional script and region, cased exactly (`en`, `en-GB`, `zh-Hant`). `es-419` and `fil`
 are refused, as Google ignores them in hreflang: use `es`, `tl`. A code is also the URL segment and app locale, so name
 translation folders after it (`lang/pt-BR/`, not `pt_BR`).
+
+With `numbers` set, `Illuminate\Support\Number` formats in the page language with that numbering system, from boot and
+on every `setLocale()` (a notification's `withLocale()` too): with `'latn'`, `Number::format(1234567)` is `1,234,567`
+on `/ar/…`, not `١٬٢٣٤٬٥٦٧`. A call's own `locale:` still wins.
 
 `localization:check` exits 1 on any FAIL. Its one row, `user_locale`: the default guard's users table has the column (WARN
 when it can't check).
@@ -145,6 +150,11 @@ Declare the languages in the test (`config(['localization.locales' => ['en', 'fr
 registered, then request `/fr/terms` like any other URL; `route('terms')` follows `app()->getLocale()`.
 
 ## Upgrading
+
+### From 0.6
+
+- An older published `config/localization.php` lacks `numbers` and gets `null`: `Number` is untouched. Add
+  `'numbers' => 'latn'` to opt in.
 
 ### From 0.5
 

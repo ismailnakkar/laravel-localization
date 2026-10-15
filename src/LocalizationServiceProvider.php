@@ -10,6 +10,7 @@ use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Contracts\Session\Middleware\AuthenticatesSessions;
+use Illuminate\Foundation\Events\LocaleUpdated;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Routing\Events\RouteMatched;
 use Illuminate\Routing\Route;
@@ -67,6 +68,9 @@ final class LocalizationServiceProvider extends ServiceProvider
 
         Event::listen(Login::class, [UserLocale::class, 'fillOnSignIn']);
         Event::listen([Logout::class, CurrentDeviceLogout::class], [UserLocale::class, 'keepAfterSignOut']);
+        // After boot, then every setLocale(), a notification's withLocale() and its restore included.
+        $this->app->booted([NumberLocale::class, 'sync']);
+        Event::listen(LocaleUpdated::class, [NumberLocale::class, 'sync']);
 
         if (Locales::configured() !== null) {
             $this->loadRoutesFrom(__DIR__ . '/../routes/locale.php');
