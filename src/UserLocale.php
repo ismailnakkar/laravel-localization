@@ -6,8 +6,11 @@ namespace Localization;
 
 use BackedEnum;
 use Illuminate\Auth\Events\CurrentDeviceLogout;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 use Localization\Http\ResolveLocale;
 
@@ -65,6 +68,28 @@ final class UserLocale
         }
 
         $user->syncOriginalAttribute($column);
+    }
+
+    /** Sign-in lands on an unprefixed page, which would guess: an empty account takes the language on screen first. */
+    public static function fillOnSignIn(Login $event): void
+    {
+        $locales = Locales::configured();
+        $code = app()->getLocale();
+        $guard = Auth::guard($event->guard);
+
+        // Not a remember-me restore: nothing is on screen yet, and AuthenticateSession may still refuse it. Not a signed
+        // link: its sender chose the language. A sign-in needs the password past CSRF, so no forged request reaches here.
+        if (
+            $locales === null
+            || self::of($event->user, $locales) !== null
+            || ! in_array($code, $locales->codes, true)
+            || ($guard instanceof StatefulGuard && $guard->viaRemember())
+            || request()->query->has('signature')
+        ) {
+            return;
+        }
+
+        rescue(static fn () => self::save($event->user, $code, unlessSet: $locales));
     }
 
     /** Signing out ends the session that held the account's language: the cookie keeps it, as it keeps a choice. */

@@ -504,15 +504,14 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertSame([], $codes);
     }
 
-    /** Not the copy it signed up on: opening that recorded nothing. */
-    public function test_a_new_account_takes_the_language_of_the_first_page_it_sees(): void
+    /** The instance sign-up created lacks the column: its row takes the copy it signed up on. */
+    public function test_signing_up_on_a_copy_fills_the_new_account_with_it(): void
     {
         $this->withHeaders(['Accept-Language' => 'es'])->post('/fr/sign-up')->assertContent('fr');
-        // Reload the user: the instance sign-up created lacks the column.
         Auth::forgetGuards();
-        $this->get('/plain')->assertContent('es');
+        $this->get('/plain')->assertContent('fr');
 
-        $this->assertSame('es', User::query()->where('name', 'new')->value('locale'));
+        $this->assertSame('fr', User::query()->where('name', 'new')->value('locale'));
     }
 
     public function test_signing_in_on_a_copy_keeps_the_account_and_the_members_area_speaks_it(): void
@@ -551,11 +550,12 @@ final class ResolveLocaleTest extends LanguagesTestCase
         yield 'off a copy' => ['/members/sign-in', 'ar', 'ar'];
         yield 'through a signed link' => ['/fr/sign-in?signature=x', 'ar', 'ar'];
         yield 'through a signed link, an account without a language' => ['/fr/sign-in?signature=x', null, 'es'];
-        yield 'on a copy, an account without a language' => ['/fr/sign-in', null, 'es'];
+        yield 'on a copy, an account without a language' => ['/fr/sign-in', null, 'fr'];
+        yield 'off a copy, an account without a language' => ['/members/sign-in', null, 'es'];
     }
 
     #[DataProvider('signIns')]
-    public function test_signing_in_keeps_the_account_else_fills_it_with_the_visitors_language(string $uri, ?string $before, string $after): void
+    public function test_signing_in_keeps_the_account_else_fills_it_with_the_language_on_screen(string $uri, ?string $before, string $after): void
     {
         $member = User::create(['name' => 'member', 'locale' => $before]);
         $codes = [];
@@ -569,6 +569,43 @@ final class ResolveLocaleTest extends LanguagesTestCase
 
         $this->assertSame($before === $after ? [] : [$after], $codes);
         $this->assertSame($after, $member->fresh()?->locale);
+    }
+
+    /** @return iterable<string, array{array<string, string>}> the sign-in's headers */
+    public static function signInsOnACopy(): iterable
+    {
+        yield 'a form' => [[]];
+        yield 'a Livewire update replaying the copy' => [['Sec-Fetch-Site' => 'same-origin', 'Sec-Fetch-Dest' => 'empty', 'X-Livewire' => '1']];
+    }
+
+    /**
+     * The page after sign-in is unprefixed and would take the browser's language: the sign-in on the copy fills first.
+     *
+     * @param  array<string, string>  $headers
+     */
+    #[DataProvider('signInsOnACopy')]
+    public function test_signing_in_on_a_copy_fills_an_empty_account_with_it_and_the_next_page_keeps_it(array $headers): void
+    {
+        $member = User::create(['name' => 'member', 'locale' => null]);
+        $this->withHeaders(['Accept-Language' => 'en']);
+
+        $this->post('/fr/sign-in', [], $headers)->assertOk()->assertContent('fr');
+        $this->assertSame('fr', User::query()->value('locale'));
+
+        $this->get('/members')->assertOk()->assertContent('fr');
+        $this->assertSame('fr', $member->fresh()?->locale);
+    }
+
+    /** A restore shows nothing yet: the bare copy from outside still opens in the visitor's choice. */
+    public function test_a_remember_me_restore_fills_nothing(): void
+    {
+        $member = User::create(['name' => 'member', 'locale' => null, 'password' => 'hash-now', 'remember_token' => 'token']);
+
+        $this->withCookie($this->recallerName(), "{$member->id}|token|hash-now")->withCookie(ResolveLocale::COOKIE, 'fr')
+            ->get('/terms', ['Sec-Fetch-Site' => 'none', 'Sec-Fetch-Dest' => 'document'])->assertRedirect('/fr/terms');
+
+        $this->assertAuthenticatedAs($member);
+        $this->assertNull($member->fresh()?->locale);
     }
 
     public function test_an_admin_signed_in_as_a_member_never_writes_the_members_account(): void

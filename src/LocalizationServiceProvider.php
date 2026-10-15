@@ -6,6 +6,7 @@ namespace Localization;
 
 use Closure;
 use Illuminate\Auth\Events\CurrentDeviceLogout;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Contracts\Session\Middleware\AuthenticatesSessions;
@@ -64,6 +65,7 @@ final class LocalizationServiceProvider extends ServiceProvider
                 ->addToMiddlewarePriorityAfter(AuthenticatesSessions::class, ApplyLocale::class);
         });
 
+        Event::listen(Login::class, [UserLocale::class, 'fillOnSignIn']);
         Event::listen([Logout::class, CurrentDeviceLogout::class], [UserLocale::class, 'keepAfterSignOut']);
 
         if (Locales::configured() !== null) {
