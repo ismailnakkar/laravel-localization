@@ -4,6 +4,13 @@ All notable changes are listed here, following [Keep a Changelog](https://keepac
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While 0.x, breaking changes bump the minor. Anything
 marked `@internal` may change in any release.
 
+## [Unreleased]
+
+### Fixed
+
+- The `RouteMatched` listener that applies a copy's language is a class callable (`@internal` `MatchedRoute::apply`),
+  not a closure, so `event:list` names it. Nothing to change.
+
 ## [0.7.0] - 2026-10-15
 
 ### Added

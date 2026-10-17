@@ -7,11 +7,14 @@ namespace Localization\Tests;
 use Closure;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Events\RouteMatched;
 use Illuminate\Routing\Route as RoutingRoute;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 use Localization\Locales;
 use Localization\LocalizedRoute;
+use Localization\MatchedRoute;
 use Localization\Tests\Fixtures\EarlierFormatterProvider;
 use Localization\Tests\Fixtures\EarlierListenerProvider;
 use Localization\Tests\Fixtures\LocalizedController;
@@ -346,6 +349,13 @@ final class LocalizedRoutesTest extends TestCase
         $this->get('/fr/terms')->assertOk();
 
         $this->assertSame(['terms'], EarlierListenerProvider::$names);
+    }
+
+    public function test_the_route_matched_listener_is_a_class_callable(): void
+    {
+        // A closure would show in event:list only as a file and line, and assertListening() could match it only as Closure::class.
+        Event::fake();
+        Event::assertListening(RouteMatched::class, [MatchedRoute::class, 'apply']);
     }
 
     public function test_action_urls_follow_the_current_locale_whichever_copy_the_lookup_keeps(): void

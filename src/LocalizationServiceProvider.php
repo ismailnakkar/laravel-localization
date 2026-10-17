@@ -12,7 +12,6 @@ use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Contracts\Session\Middleware\AuthenticatesSessions;
 use Illuminate\Foundation\Events\LocaleUpdated;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
-use Illuminate\Routing\Events\RouteMatched;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
 use Illuminate\Routing\UrlGenerator;
@@ -37,18 +36,7 @@ final class LocalizationServiceProvider extends ServiceProvider
         $this->app->singleton(Localization::class);
 
         // Before any route middleware, outside `web` too. In register() so boot()-time listeners see the locale.
-        $this->app->make(Router::class)->matched(static function (RouteMatched $event): void {
-            if (($localized = LocalizedRoute::of($event->route)) === null) {
-                return;
-            }
-
-            app()->setLocale($localized->locale); // Octane: the request's sandbox.
-
-            if ($localized->locale !== $localized->locales->default) {
-                // Copies are named localization.{code}.… for route:cache; the matched one takes the plain name.
-                $event->route->action['as'] = $localized->name($event->route);
-            }
-        });
+        $this->app->make(Router::class)->matched([MatchedRoute::class, 'apply']);
     }
 
     public function boot(): void
