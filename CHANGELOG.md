@@ -4,7 +4,7 @@ All notable changes are listed here, following [Keep a Changelog](https://keepac
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While 0.x, breaking changes bump the minor. Anything
 marked `@internal` may change in any release.
 
-## [Unreleased]
+## [0.7.1] - 2026-10-18
 
 ### Fixed
 
@@ -171,6 +171,7 @@ Extracted from laravel-seo 0.4.2 under new names. To upgrade, follow its
 
 - The switcher no longer doubles the base path in apps served from a subdirectory (`/app/app/terms`).
 
+[0.7.1]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.7.1
 [0.7.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.7.0
 [0.6.2]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.6.2
 [0.6.1]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.6.1
