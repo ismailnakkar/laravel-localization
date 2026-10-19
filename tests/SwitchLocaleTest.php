@@ -464,7 +464,6 @@ final class SwitchLocaleTest extends LanguagesTestCase
         $translator->addLines(['languages.en' => 'English', 'languages.fr' => 'French'], 'en');
     }
 
-    /** "Use français" approves the page's language: kept like a switcher choice, so the banner goes. */
     public function test_a_member_who_keeps_the_page_language_saves_it_to_the_account_and_the_banner_goes(): void
     {
         $this->translateTheBanner();
@@ -501,7 +500,6 @@ final class SwitchLocaleTest extends LanguagesTestCase
         $this->get('/fr/banner')->assertContent('fr');
     }
 
-    /** A guest's "Use English" keeps the page's language as their choice, so the banner goes. */
     public function test_a_guest_who_keeps_the_page_language_chooses_it_and_the_banner_goes(): void
     {
         $this->translateTheBanner();
@@ -514,7 +512,6 @@ final class SwitchLocaleTest extends LanguagesTestCase
         $this->get('/banner')->assertContent('en');
     }
 
-    /** Its sender chose a signed page's language, and one that can't be signed again would come back as is. */
     public function test_a_signed_page_gets_no_suggestion(): void
     {
         $this->withHeader('Accept-Language', 'fr')->get(URL::signedRoute('prefs', ['user' => 1]))->assertOk()->assertContent('en');
@@ -525,29 +522,6 @@ final class SwitchLocaleTest extends LanguagesTestCase
     public function test_the_readme_banner_is_the_one_tested_here(): void
     {
         $this->assertStringContainsString(self::BANNER, (string)file_get_contents(__DIR__ . '/../README.md'));
-    }
-
-    /** @return iterable<string, array{?string, ?string}> column, accountLanguage() */
-    public static function accountLanguages(): iterable
-    {
-        yield 'a configured code' => ['ar', 'ar'];
-        yield 'none' => [null, null];
-        yield 'a code no longer configured' => ['de', null];
-    }
-
-    #[DataProvider('accountLanguages')]
-    public function test_the_account_language_is_a_configured_code_the_account_holds(?string $column, ?string $account): void
-    {
-        $this->actingAs(User::create(['name' => 'member', 'locale' => $column]));
-
-        $this->assertSame($account, $this->localization()->accountLanguage());
-    }
-
-    public function test_a_guest_has_no_account_language(): void
-    {
-        $this->get('/fr/terms');
-
-        $this->assertNull($this->localization()->accountLanguage());
     }
 
     /** @return iterable<string, array{string, array<string, string>, ?string, ?string}> URI, headers, choice, suggestion() */

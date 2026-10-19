@@ -14,10 +14,10 @@ use Symfony\Component\HttpFoundation\Response;
 /** Never read the user: it would sign in a remember-me cookie before AuthenticateSession checks it. */
 final class ResolveLocale
 {
-    /** The visitor's choice (the switcher, a suggestion's answer), or a member's account copied in. Nothing else. */
+    /** The visitor's choice (switcher or suggestion answer) or a member's account copied in; nothing else. */
     public const string PICKED_KEY = 'localization.picked';
 
-    /** The same choice for a year, so a guest keeps it past the session: set by localization.switch and by signing out. */
+    /** Keeps the choice a year, past the session; set by localization.switch and by signing out. */
     public const string COOKIE = 'localization';
 
     public function handle(Request $request, Closure $next): Response
@@ -33,19 +33,19 @@ final class ResolveLocale
         return $next($request);
     }
 
-    /** @internal What the visitor told us first, then what we guess. */
+    /** @internal */
     public static function choice(Request $request, Locales $locales, ?string $account = null): string
     {
         return $account ?? self::stored($request, $locales) ?? $locales->preferredBy($request) ?? $locales->default;
     }
 
-    /** @internal The cookie that keeps $code past the session. */
+    /** @internal */
     public static function remember(string $code): Cookie
     {
         return cookie(self::COOKIE, $code, 60 * 24 * 365);
     }
 
-    /** @internal The visitor's choice, from the session else the cookie, if still configured. */
+    /** @internal */
     public static function stored(Request $request, Locales $locales): ?string
     {
         $configured = static fn (mixed $code): ?string => is_string($code) && in_array($code, $locales->codes, true) ? $code : null;

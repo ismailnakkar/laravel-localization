@@ -9,7 +9,7 @@ use Illuminate\Support\Number;
 /** @internal */
 final class NumberLocale
 {
-    /** Number keeps its own static locale: setLocale() never touches it, and in a test process it outlives the app. */
+    /** Number keeps a static locale that setLocale() never touches and that outlives the app in tests. */
     public static function sync(): void
     {
         $numbers = config('localization.numbers');

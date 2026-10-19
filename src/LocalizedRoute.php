@@ -10,7 +10,7 @@ use LogicException;
 
 final readonly class LocalizedRoute
 {
-    /** @internal Route-action key; its value stays a plain array so route:cache can var_export it. */
+    /** @internal Its value stays a plain array: route:cache var_exports it. */
     public const string ACTION = 'localization_locale';
 
     /** @internal */
@@ -25,9 +25,9 @@ final readonly class LocalizedRoute
     }
 
     /**
-     * Every language's copy of $path, a path $route matched: this copy's, then each code's in config order, default
-     * first. On the fr copy, '/fr/terms' (or '/%66r/terms') → ['path' => '/fr/terms', 'alternates' =>
-     * ['en' => '/terms', 'fr' => '/fr/terms']]. null outside Route::localized().
+     * $path (one $route matched) in this copy, then in every code's in config order; null outside Route::localized().
+     * On the fr copy, '/fr/terms' (or '/%66r/terms') → ['path' => '/fr/terms', 'alternates' =>
+     * ['en' => '/terms', 'fr' => '/fr/terms']].
      *
      * @return array{path: string, alternates: array<string, string>}|null
      *
@@ -58,7 +58,7 @@ final readonly class LocalizedRoute
     {
         $base = $this->locale === $this->locales->default ? $path : self::withoutPrefix($path, $this->locale);
 
-        // One leading slash: a catch-all's `/fr//host` would leave `//host`, a host to browsers.
+        // One leading slash: browsers read a catch-all's `//host` as a host.
         return $code === $this->locales->default ? '/' . ltrim($base, '/') : '/' . $code . rtrim($base, '/');
     }
 

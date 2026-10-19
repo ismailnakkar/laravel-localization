@@ -9,7 +9,6 @@ return [
     // User attribute holding their language; null: session only.
     'user_locale' => null,
 
-    // Laravel's Number formats in the page language with this ICU numbering system, e.g. 'latn' (Latin digits in
-    // Arabic); null leaves Number alone.
+    // ICU numbering system for Laravel's Number in the page language, e.g. 'latn' (Latin digits in Arabic); null: off.
     'numbers' => null,
 ];

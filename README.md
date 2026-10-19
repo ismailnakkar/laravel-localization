@@ -1,10 +1,7 @@
 # Laravel Localization
 
-Localized routes and per-visitor language for Laravel: `/terms` and `/fr/terms` from one route, and a switcher.
-
-## Requirements
-
-PHP 8.4+ and Laravel 12.61.1+ or 13.12+.
+Localized routes and per-visitor language for Laravel: one route serves `/terms` and `/fr/terms`, and a switcher and a
+suggestion banner let visitors pick their language.
 
 ## Install
 
@@ -13,9 +10,29 @@ composer require ismailnakkar/laravel-localization
 php artisan vendor:publish --tag=localization-config
 ```
 
-## Usage
+For [account language](#account-language), add `users.locale`, then set `'user_locale' => 'locale'`:
 
-Set `'locales' => ['en', 'fr', 'es']` (default first) in `config/localization.php` and wrap the translated pages:
+```bash
+php artisan vendor:publish --tag=localization-migrations
+php artisan migrate
+```
+
+## Configuration
+
+| Key | Default | |
+|---|---|---|
+| `locales` | `[]` | Language codes, default first. Fewer than two turns everything but `numbers` off. |
+| `user_locale` | `null` | The users table's language column. `null`: session only. |
+| `numbers` | `null` | An ICU numbering system for Laravel's `Number`, e.g. `'latn'`. `null`: `Number` untouched. |
+
+Codes are ISO 639-1 plus an optional script and region, cased exactly (`en`, `en-GB`, `zh-Hant`). `es-419` and `fil`
+are refused, as Google ignores them in hreflang: use `es`, `tl`. A code is also the URL segment and app locale, so name
+translation folders after it (`lang/pt-BR/`, not `pt_BR`).
+
+With `'numbers' => 'latn'`, `Number` formats in the page language with Latin digits: `Number::format(1234567)` is
+`1,234,567` on `/ar/…`, not `١٬٢٣٤٬٥٦٧`. A call's own `locale:` still wins.
+
+## Usage
 
 ```php
 Route::localized(function () {
@@ -24,35 +41,34 @@ Route::localized(function () {
 });
 ```
 
-Render `<html lang="{{ app()->getLocale() }}">`, add [the switcher](#language) and run `php artisan localization:check` on deploy.
+Each route gets a copy per language. Render `<html lang="{{ app()->getLocale() }}">` and add [the
+switcher](#language).
 
 - Call `Route::localized()` outside prefix groups, before catch-all and fallback routes. Inside, prefix with
-  `Route::prefix()->group()`, never a route-level `->prefix()`.
-- Only put pages translated into every language (and their forms' POST routes) inside: each gets a copy per language.
-- Link with `route()`; `url()` and hard-coded paths lead to the default language.
+  `Route::prefix()->group()`, never a route-level `->prefix()`. Either prefix mistake throws.
+- Put only pages translated into every language (and their forms' POST routes) inside.
+- Link with `route()` or `action()`, which follow `app()->getLocale()`; `url()` and hard-coded paths lead to the default
+  language.
 - On `/fr/terms`, `Route::currentRouteName()` and `routeIs()` see `terms`; `route:list` shows `localization.fr.terms`.
-- With `en` the default, `/en/…` 301s to the bare URL only for localized GET pages; other `/en/…` paths fall through to
-  your fallback, else 404. Register your own `/en/…` routes before `Route::localized()`.
+- With `en` the default, `/en/…` 301s to the bare URL for localized GET pages only. Register your own `/en/…` routes
+  before `Route::localized()`.
 - An unmatched URL's 404 renders in `config('app.locale')` unless a `Route::fallback()` catches it.
 
 ## Language
 
-- The visitor's language is their account's, else the one they chose (switcher or [suggestion](#account-language)),
-  else `Accept-Language`'s, else the default. A localized copy renders its URL's language; other pages in `web` render
-  theirs.
-- Opening a copy records nothing (beyond filling an empty account once, see [Account language](#account-language)).
-  Only a choice is kept: in the session, in a `localization` cookie for a year (so a guest keeps it past the session),
-  and with `user_locale` the account.
-- Arriving from outside the site (another site, a bookmark, a typed URL) on any localized page's default copy 302s to the
-  account's language, else the chosen one; never to `Accept-Language`'s, which is only suggested. Typing `/en/…`
-  opens the default copy regardless. Crawlers, signed links and internal clicks are exempt. Don't let a CDN cache
-  localized pages' HTML.
+The visitor's language is their account's, else the one they chose (switcher or [suggestion](#account-language)), else
+`Accept-Language`'s, else the default. A copy renders its URL's language; other pages in `web` render the visitor's.
+
+- Only a choice is kept: in the session, in a `localization` cookie for a year, and with `user_locale` in the account.
+  Opening a copy records nothing, beyond filling an empty account once.
+- Arriving from outside (another site, a bookmark, a typed URL) on a default copy 302s to the account's language,
+  else the chosen one, never `Accept-Language`'s. Typed `/en/…` URLs, crawlers, signed links and internal clicks are
+  exempt. Don't let a CDN cache localized pages' HTML.
 - On Laravel 13, a POST catch-all inside `Route::domain()` shadows the switcher's `POST /locale`.
 
-The switcher saves the language to the session (and, with `user_locale`, the account) and returns to the same page in
-that language. A signed page is re-signed only if its route is named and its signature is valid under the current
-`app.key`, else it comes back unchanged. Labels are `languages.{code}` in their own language (`'fr' => 'Français'` in
-`lang/fr/languages.php`):
+The switcher saves the language and returns to the same page in it. A signed page is re-signed only if its route is
+named and its signature is valid under the current `app.key`, else it comes back unchanged. Labels are
+`languages.{code}` in their own language (`'fr' => 'Français'` in `lang/fr/languages.php`):
 
 ```blade
 @inject('localization', \Localization\Localization::class)
@@ -67,14 +83,14 @@ that language. A signed page is re-signed only if its route is named and its sig
 
 ## Account language
 
-Set `user_locale` to your users' language column. A member's account language outranks the session, and the switcher
-saves it; an account without one gets the language on screen once: at a sign-in on a non-default copy (`/fr/login`;
-Laravel's `Login`), else on its first page view (a value outside `locales` counts as none and is overwritten); models
-without the column are skipped. Signing out (Laravel's `Logout` or `CurrentDeviceLogout`) copies it into the
-`localization` cookie, so the guest keeps it. Implement `HasLocalePreference` returning that column so mail uses it.
+Models without the `user_locale` column are skipped. An account without a language (a value outside `locales` counts
+as none) takes the one on screen once: at a sign-in on a non-default copy (`/fr/login`, Laravel's `Login` event), else
+on its next page view. Signing out (`Logout` or `CurrentDeviceLogout`) copies it into the `localization` cookie.
+Implement `HasLocalePreference` returning the column so mail uses it. Run `php artisan localization:check` on deploy:
+it fails (exit 1) when the default guard's users table lacks the column, and warns when it can't check.
 
-Anyone, members too, whose language differs from the page's gets a suggestion. Render this in your layout (not error
-views); either answer is kept like a switcher choice, so the banner goes:
+Anyone whose language differs from the page's gets a suggestion. Render this in your layout (not error views); either
+answer is kept like a switcher choice, so the banner goes:
 
 ```blade
 @inject('localization', \Localization\Localization::class)
@@ -101,11 +117,20 @@ $localization->saveUserLocaleUsing(fn (User $user, string $code) => app(Users::c
 
 Don't render the suggestion while impersonating either: no answer is saved, so it would never go.
 
+## Building a language's path
+
+`Localization\LocalizedRoute::of($route)` is `null` outside `Route::localized()`. On the `fr` copy, its
+`path('/fr/terms', 'en')` is `/terms`, and `LocalizedRoute::copies($route, '/fr/terms')` (also `null` outside) is
+`['path' => '/fr/terms', 'alternates' => ['en' => '/terms', 'fr' => '/fr/terms']]`, in config order.
+
+With laravel-seo, add `$seo->alternatesUsing(\Localization\LocalizedRoute::copies(...))` to a service provider's
+`boot(\Seo\Seo $seo)`, or the copies get no hreflang links and the sitemap lists only the paths you give it.
+
 ## Middleware
 
-`ResolveLocale` (right after `StartSession`, so CSRF and throttle
-errors are translated) and `ApplyLocale` (right after `\Illuminate\Contracts\Session\Middleware\AuthenticatesSessions`,
-as it reads the user) join `web`. `ApplyLocale` must run after your session check:
+`ResolveLocale` (right after `StartSession`, so CSRF and throttle errors are translated) and `ApplyLocale` (right after
+`\Illuminate\Contracts\Session\Middleware\AuthenticatesSessions`, as it reads the user) join your `web` group, which
+must exist. `ApplyLocale` must run after your session check:
 
 - Session check not in your priority list by name or via `AuthenticatesSessions` (Sanctum's lacks it)? List it:
   `$middleware->appendToPriorityList(\Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class, YourSessionCheck::class)`.
@@ -113,65 +138,17 @@ as it reads the user) join `web`. `ApplyLocale` must run after your session chec
 - Livewire: add `\Localization\Http\ResolveLocale::class` and `\Localization\Http\ApplyLocale::class` to
   `Livewire::addPersistentMiddleware()`.
 
-## Configuration
-
-| Key | Default | |
-|---|---|---|
-| `locales` | `[]` | Language codes, default first. Fewer than two turns everything but `numbers` off. |
-| `user_locale` | `null` | The users table's language column. `null`: session only. |
-| `numbers` | `null` | An ICU numbering system for Laravel's `Number`, e.g. `'latn'`. `null`: `Number` untouched. |
-
-Codes are ISO 639-1 plus an optional script and region, cased exactly (`en`, `en-GB`, `zh-Hant`). `es-419` and `fil`
-are refused, as Google ignores them in hreflang: use `es`, `tl`. A code is also the URL segment and app locale, so name
-translation folders after it (`lang/pt-BR/`, not `pt_BR`).
-
-With `numbers` set, `Illuminate\Support\Number` formats in the page language with that numbering system, from boot and
-on every `setLocale()` (a notification's `withLocale()` too): with `'latn'`, `Number::format(1234567)` is `1,234,567`
-on `/ar/…`, not `١٬٢٣٤٬٥٦٧`. A call's own `locale:` still wins.
-
-`localization:check` exits 1 on any FAIL. Its one row, `user_locale`: the default guard's users table has the column (WARN
-when it can't check).
-
-## Building a language's path
-
-`Localization\LocalizedRoute::of($route)` is `null` outside `Route::localized()`, else the copy's marker. Its
-`path($path, $code)` turns this copy's path into `$code`'s: on the `fr` copy, `path('/fr/terms', 'en')` is `/terms`.
-
-`LocalizedRoute::copies($route, $path)` gives them all at once, or `null` outside `Route::localized()`: on the `fr`
-copy, `copies($route, '/fr/terms')` is `['path' => '/fr/terms', 'alternates' => ['en' => '/terms', 'fr' => '/fr/terms']]`,
-in config order. No route has copies while `$localization->languages()` is `[]`.
-
-With laravel-seo, add `$seo->alternatesUsing(\Localization\LocalizedRoute::copies(...))` to a service provider's
-`boot(\Seo\Seo $seo)`, or the copies get no hreflang links and the sitemap lists only the paths you give it.
-
 ## Testing
 
-Declare the languages in the test (`config(['localization.locales' => ['en', 'fr']])`) before the routes are
-registered, then request `/fr/terms` like any other URL; `route('terms')` follows `app()->getLocale()`.
+Nothing to fake: request `/fr/terms` like any URL. Routes read `locales` when they register, so set it before the app
+boots.
 
 ## Upgrading
 
-### From 0.6
+### From 0.7
 
-- An older published `config/localization.php` lacks `numbers` and gets `null`: `Number` is untouched. Add
-  `'numbers' => 'latn'` to opt in.
-
-### From 0.5
-
-- Define a `web` middleware group (every `withMiddleware()` app has one): without it, booting the HTTP kernel throws.
-
-### From 0.4
-
-- With laravel-seo, add the [`alternatesUsing()` line](#building-a-languages-path).
-
-### From 0.2
-
-- Remove `remember_locale` from `config/localization.php`, make the banner's second button post the page's language,
-  drop references to `ResolveLocale::SESSION_KEY`, and don't render the suggestion while impersonating.
-
-### From 0.1
-
-- Remove `entry_redirect` from `config/localization.php` and replace the `accountLanguageOffer()` modal with the
-  [suggestion banner](#account-language).
+- `Localization::accountLanguage()` is removed: read your user's language column, or its `preferredLocale()`, instead.
+- `localization-migrations` publishes `add_locale_to_users_table` (`users.locale`). Skip it if `user_locale` already
+  names a column of yours.
 
 [MIT licensed](LICENSE).

@@ -9,7 +9,6 @@ use Symfony\Component\Finder\Finder;
 
 final class BoundaryTest extends TestCase
 {
-    /** Nothing shipped names laravel-seo, even in a string or docblock. */
     public function test_nothing_shipped_names_laravel_seo(): void
     {
         $root = dirname(__DIR__);

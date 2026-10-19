@@ -4,6 +4,19 @@ All notable changes are listed here, following [Keep a Changelog](https://keepac
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While 0.x, breaking changes bump the minor. Anything
 marked `@internal` may change in any release.
 
+## [0.8.0] - 2026-10-19
+
+### Added
+
+- `add_locale_to_users_table`, published with `localization-migrations`: a nullable `users.locale` (`string(10)`) for
+  `user_locale`. Publish only: an installed app runs nothing new.
+
+### Removed
+
+- `Localization::accountLanguage()`: read your user's language column, or its `preferredLocale()`, instead.
+- The upgrade message for laravel-seo 0.2's `Route::localized($locales, $routes)` call: its parameter is a
+  `Closure`, so a wrong call gets PHP's `TypeError`.
+
 ## [0.7.1] - 2026-10-18
 
 ### Fixed
@@ -171,6 +184,7 @@ Extracted from laravel-seo 0.4.2 under new names. To upgrade, follow its
 
 - The switcher no longer doubles the base path in apps served from a subdirectory (`/app/app/terms`).
 
+[0.8.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.8.0
 [0.7.1]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.7.1
 [0.7.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.7.0
 [0.6.2]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.6.2

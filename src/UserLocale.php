@@ -70,18 +70,15 @@ final class UserLocale
         $user->syncOriginalAttribute($column);
     }
 
-    /** Sign-in lands on an unprefixed page, which would guess: an empty account takes the /fr copy it signed in on first. */
     public static function fillOnSignIn(Login $event): void
     {
         $locales = Locales::configured();
-        // Only a non-default copy's URL names a language the landing page can't know. The bare copy shows the default to
-        // anyone without a choice, and off a copy the request may lack that choice (a cross-site POST carries no
-        // SameSite=Lax cookie; outside `web` nothing resolved it): the landing page view fills those.
+        // Only a non-default copy names a language the landing page can't know; that page fills the rest, as this
+        // request may lack the choice (a cross-site POST has no SameSite=Lax cookie; outside `web` none was resolved).
         $code = LocalizedRoute::of(request()->route())?->locale;
         $guard = Auth::guard($event->guard);
 
-        // Not a remember-me restore: nothing is on screen yet, and AuthenticateSession may still refuse it. Not a signed
-        // link: its sender chose the language.
+        // Not a remember-me restore (nothing on screen yet; AuthenticateSession may refuse it) or a signed link.
         if (
             $locales === null
             || $code === null

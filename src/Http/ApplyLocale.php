@@ -28,7 +28,7 @@ final class ApplyLocale
         $localized = LocalizedRoute::of($request->route());
         $user = $request->user();
         $account = UserLocale::of($user, $locales);
-        // Known: the account or a choice. Never the browser, which is only a guess: that one is offered, not forced.
+        // Never the browser's language: a guess is suggested, not forced.
         $known = $account ?? ResolveLocale::stored($request, $locales);
         $target = $this->entryTarget($request, $locales, $localized, $known);
 
@@ -40,7 +40,7 @@ final class ApplyLocale
         $pageView = self::opensThePage($request);
         $hop = is_string($request->route()?->getAction(RedirectToDefaultCopy::ACTION));
 
-        // Opening a copy records nothing: only a choice is kept. A page in another language suggests theirs instead.
+        // Opening a copy records nothing: only a choice is kept.
         if ($request->hasSession()) {
             if ($pageView && $hop) {
                 $request->session()->flash(self::DEFAULT_ASKED, true);

@@ -40,7 +40,6 @@ final class LocalizedRoutesTest extends TestCase
             Route::get('unnamed', static fn () => 'unnamed');
         });
 
-        // The default registers last so it never shadows a prefixed copy.
         $this->assertSame([
             'fr'                  => 'localization.fr.home',
             'fr/legal/terms'      => 'localization.fr.pages.terms',
@@ -98,15 +97,6 @@ final class LocalizedRoutesTest extends TestCase
         $this->expectExceptionMessage('Route::localized(): [admin/fr/x] puts the locale after a route-level prefix');
 
         Route::localized($routes);
-    }
-
-    public function test_an_old_call_passing_locales_says_how_to_upgrade(): void
-    {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage("Route::localized() takes only the routes closure: set the languages in config('localization.locales') as a list of codes, default first.");
-
-        // @phpstan-ignore arguments.count (the 0.2 call, on purpose)
-        Route::localized(new Locales(['en', 'fr'], 'en'), static fn () => null);
     }
 
     public function test_below_two_locales_the_routes_register_once_as_plain_routes(): void
@@ -192,9 +182,8 @@ final class LocalizedRoutesTest extends TestCase
         foreach ([
             '/en'                 => 'http://localhost',
             '/en/posts/7?b=2&a=1' => 'http://localhost/posts/7?b=2&a=1',
-            // The router matches the decoded path.
-            '/%65n/posts/7' => 'http://localhost/posts/7',
-            '/en%2Fposts/7' => 'http://localhost/posts/7',
+            '/%65n/posts/7'       => 'http://localhost/posts/7',
+            '/en%2Fposts/7'       => 'http://localhost/posts/7',
         ] as $url => $location) {
             $this->get($url)->assertStatus(301)->assertHeader('Location', $location);
         }

@@ -66,11 +66,11 @@ abstract class TestCase extends BaseTestCase
         Schema::create('users', static function (Blueprint $table): void {
             $table->id();
             $table->string('name')->default('');
-            $table->string('locale', 20)->nullable();
             $table->string('password')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
+        (require __DIR__ . '/../database/migrations/add_locale_to_users_table.php')->up();
     }
 
     protected function createAdminsTable(): void

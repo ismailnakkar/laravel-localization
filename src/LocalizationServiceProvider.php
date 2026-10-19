@@ -42,11 +42,11 @@ final class LocalizationServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->publishes([__DIR__ . '/../config/localization.php' => $this->app->configPath('localization.php')], 'localization-config');
+        $this->publishesMigrations([__DIR__ . '/../database/migrations/add_locale_to_users_table.php' => $this->app->databasePath('migrations/2026_10_19_000000_add_locale_to_users_table.php')], 'localization-migrations');
 
-        // ResolveLocale after StartSession, so CSRF and auth refusals are translated.
-        // ApplyLocale after AuthenticateSession, as it reads the user.
-        // On every boot: both read the config per request, so languages set after boot still apply.
-        // No `web` group: the Kernel throws, as the README promises both join it.
+        // ResolveLocale after StartSession, so CSRF and auth refusals are translated; ApplyLocale after
+        // AuthenticateSession, as it reads the user. Unconditional: both read the config per request.
+        // Without a `web` group the Kernel throws, as the README promises both join it.
         $this->callAfterResolving(Kernel::class, static function (HttpKernel $kernel): void {
             $kernel->appendMiddlewareToGroup('web', ResolveLocale::class)
                 ->appendMiddlewareToGroup('web', ApplyLocale::class)
@@ -64,12 +64,7 @@ final class LocalizationServiceProvider extends ServiceProvider
             $this->loadRoutesFrom(__DIR__ . '/../routes/locale.php');
         }
 
-        // mixed, not Closure: an old call passing the languages first gets the upgrade message, not a TypeError.
-        Router::macro('localized', function (mixed $routes): void {
-            if (! $routes instanceof Closure) {
-                throw new LogicException("Route::localized() takes only the routes closure: set the languages in config('localization.locales') as a list of codes, default first.");
-            }
-
+        Router::macro('localized', function (Closure $routes): void {
             /** @var Router $this */
             $locales = Locales::configured();
 

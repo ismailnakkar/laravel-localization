@@ -24,6 +24,14 @@ final class ConfigTest extends TestCase
         $this->assertSame([config_path('localization.php')], array_values($paths));
     }
 
+    public function test_the_stub_publishes_dated_with_the_localization_migrations_tag(): void
+    {
+        $paths = ServiceProvider::pathsToPublish(LocalizationServiceProvider::class, 'localization-migrations');
+
+        $this->assertSame(array_map('realpath', glob(__DIR__ . '/../database/migrations/*.php') ?: []), array_map('realpath', array_keys($paths)));
+        $this->assertSame([database_path('migrations/2026_10_19_000000_add_locale_to_users_table.php')], array_values($paths));
+    }
+
     /** @return iterable<string, array{mixed, string}> config, message */
     public static function malformedLocales(): iterable
     {
@@ -101,7 +109,6 @@ final class ConfigTest extends TestCase
     public function test_one_language_lists_none_and_offers_none(): void
     {
         $this->assertSame([], $this->localization()->languages());
-        $this->assertNull($this->localization()->accountLanguage());
         $this->assertNull($this->localization()->suggestion());
     }
 }

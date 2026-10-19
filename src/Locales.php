@@ -12,7 +12,7 @@ final readonly class Locales
 {
     /**
      * @param  list<string>  $codes
-     * @param  string  $default  never config('app.locale'), which Application::setLocale() overwrites
+     * @param  string  $default  not config('app.locale'): setLocale() overwrites it
      *
      * @throws InvalidArgumentException
      */
@@ -42,7 +42,7 @@ final readonly class Locales
             return null;
         }
 
-        // Not array_is_list(): int keys may have gaps (array_filter()).
+        // Not array_is_list(): array_filter() leaves gaps.
         if (! is_array($locales) || ! array_all($locales, static fn (mixed $code, int|string $key): bool => is_int($key) && is_string($code))) {
             throw new InvalidArgumentException("localization.locales: list the codes only, default first, e.g. ['en', 'fr']; label them with your own translations.");
         }

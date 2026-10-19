@@ -239,7 +239,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->get('/plain')->assertContent('ar');
     }
 
-    /** Following a link to a copy shows it; pages without a language in the URL keep the browser's. */
     public function test_a_guest_following_a_link_to_a_copy_keeps_their_language_elsewhere_and_nothing_is_written(): void
     {
         $this->withHeaders(['Accept-Language' => 'en'])->get('/fr/terms', ['Sec-Fetch-Site' => 'cross-site', 'Sec-Fetch-Dest' => 'document'])->assertContent('fr');
@@ -291,7 +290,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->actingAs($user)->get('/plain')->assertContent('fr');
     }
 
-    /** A week idle, a sign-out: the session ends, and the cookie the switcher set keeps what the guest chose. */
     public function test_a_guests_choice_outlives_the_session_through_its_cookie(): void
     {
         $this->withCookie(ResolveLocale::COOKIE, 'fr')->withHeader('Accept-Language', 'es')->get('/plain')->assertContent('fr');
@@ -310,7 +308,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
         yield 'this device only' => ['/sign-out-here'];
     }
 
-    /** The session that held the account's language ends; the cookie keeps it, as a guest's choice is kept. */
     #[DataProvider('signOuts')]
     public function test_signing_out_keeps_the_accounts_language_in_the_choice_cookie(string $uri): void
     {
@@ -465,7 +462,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertSame('fr', $member->fresh()?->locale);
     }
 
-    /** A bare copy opened from outside shows the default: the account takes that, never the browser's guess. */
     public function test_a_bare_copy_opened_from_outside_fills_an_empty_account_with_what_it_shows(): void
     {
         $member = User::create(['name' => 'member', 'locale' => null]);
@@ -476,7 +472,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertSame('en', $member->fresh()?->locale);
     }
 
-    /** The /en/… hop shows nothing, so it fills nothing: the English page it lands on does. */
     public function test_typing_the_defaults_prefix_fills_an_empty_account_with_the_default_never_the_browsers(): void
     {
         $member = User::create(['name' => 'member', 'locale' => null]);
@@ -504,7 +499,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertSame([], $codes);
     }
 
-    /** The instance sign-up created lacks the column: its row takes the copy it signed up on. */
     public function test_signing_up_on_a_copy_fills_the_new_account_with_it(): void
     {
         $this->withHeaders(['Accept-Language' => 'es'])->post('/fr/sign-up')->assertContent('fr');
@@ -571,7 +565,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertSame($after, $member->fresh()?->locale);
     }
 
-    /** The page after sign-in is unprefixed and would take the browser's language: the sign-in on the copy fills first. */
     public function test_signing_in_on_a_copy_fills_an_empty_account_with_it_and_the_next_page_keeps_it(): void
     {
         $member = User::create(['name' => 'member', 'locale' => null]);
@@ -584,7 +577,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertSame('fr', $member->fresh()?->locale);
     }
 
-    /** The bare copy shows the default to anyone without a choice: the page it lands on fills, as off a copy. */
     public function test_signing_in_on_the_default_copy_leaves_the_fill_to_the_page_it_lands_on(): void
     {
         $member = User::create(['name' => 'member', 'locale' => null]);
@@ -597,7 +589,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertSame('es', $member->fresh()?->locale);
     }
 
-    /** A cross-site POST (an identity provider's form_post) carries no SameSite=Lax choice: the page it lands on fills. */
     public function test_a_cross_site_sign_in_off_a_copy_leaves_the_fill_to_the_page_it_lands_on(): void
     {
         $member = User::create(['name' => 'member', 'locale' => null]);
@@ -610,7 +601,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertSame('fr', $member->fresh()?->locale);
     }
 
-    /** A job or the console shows no page: nothing resolved the visitor's language. */
     public function test_a_sign_in_outside_a_request_fills_nothing(): void
     {
         $member = User::create(['name' => 'member', 'locale' => null]);
@@ -620,7 +610,6 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertNull($member->fresh()?->locale);
     }
 
-    /** A restore shows nothing yet: the bare copy from outside still opens in the visitor's choice. */
     public function test_a_remember_me_restore_fills_nothing(): void
     {
         $member = User::create(['name' => 'member', 'locale' => null, 'password' => 'hash-now', 'remember_token' => 'token']);

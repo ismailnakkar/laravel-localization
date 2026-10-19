@@ -1,4 +1,4 @@
-# config and routes must ship.
+# config, database and routes must ship.
 /.github           export-ignore
 /tests             export-ignore
 /.gitattributes    export-ignore
