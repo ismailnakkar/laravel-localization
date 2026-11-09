@@ -11,4 +11,7 @@ return [
 
     // ICU numbering system for Laravel's Number in the page language, e.g. 'latn' (Latin digits in Arabic); null: off.
     'numbers' => null,
+
+    // Query parameter older URLs carried the language in, e.g. 'lang': ?lang=fr 301s to the fr copy; null: off.
+    'legacy_query' => null,
 ];

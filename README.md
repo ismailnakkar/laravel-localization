@@ -24,6 +24,7 @@ php artisan migrate
 | `locales` | `[]` | Language codes, default first. Fewer than two turns everything but `numbers` off. |
 | `user_locale` | `null` | The users table's language column. `null`: session only. |
 | `numbers` | `null` | An ICU numbering system for Laravel's `Number`, e.g. `'latn'`. `null`: `Number` untouched. |
+| `legacy_query` | `null` | The query parameter older URLs carried the language in, e.g. `'lang'`: see [Older `?lang=` URLs](#older-lang-urls). `null`: off. |
 
 Codes are ISO 639-1 plus an optional script and region, cased exactly (`en`, `en-GB`, `zh-Hant`). `es-419` and `fil`
 are refused, as Google ignores them in hreflang: use `es`, `tl`. A code is also the URL segment and app locale, so name
@@ -53,6 +54,14 @@ switcher](#language).
 - With `en` the default, `/en/…` 301s to the bare URL for localized GET pages only. Register your own `/en/…` routes
   before `Route::localized()`.
 - An unmatched URL's 404 renders in `config('app.locale')` unless a `Route::fallback()` catches it.
+
+## Older `?lang=` URLs
+
+With `'legacy_query' => 'lang'`, a GET or HEAD of a localized page carrying `?lang=fr` 301s to its `fr` copy, `lang`
+dropped and every other parameter kept as spelt: `/terms?lang=fr&page=2` → `/fr/terms?page=2`. The value matches like
+`Accept-Language`, in any case, with `-` or `_`: `fr-FR` and `fr_FR` reach `fr` when only `fr` is configured, `zh_TW`
+reaches `zh-Hant`. An unknown value, a signed URL (its query is its signature), a page outside `Route::localized()` and
+any other method pass through.
 
 ## Language
 
@@ -128,6 +137,7 @@ With laravel-seo, add `$seo->alternatesUsing(\Localization\LocalizedRoute::copie
 
 ## Middleware
 
+`RedirectLegacyQuery` (first, ahead of the session and any redirect; it passes through unless `legacy_query` is set),
 `ResolveLocale` (right after `StartSession`, so CSRF and throttle errors are translated) and `ApplyLocale` (right after
 `\Illuminate\Contracts\Session\Middleware\AuthenticatesSessions`, as it reads the user) join your `web` group, which
 must exist. `ApplyLocale` must run after your session check:
@@ -144,6 +154,11 @@ Nothing to fake: request `/fr/terms` like any URL. Routes read `locales` when th
 boots.
 
 ## Upgrading
+
+### From 0.8
+
+Nothing to change: an older published config lacks `legacy_query`, which stays off. An app with its own `?lang=`
+redirect sets `'legacy_query' => 'lang'` and deletes it.
 
 ### From 0.7
 

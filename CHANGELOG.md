@@ -4,6 +4,16 @@ All notable changes are listed here, following [Keep a Changelog](https://keepac
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While 0.x, breaking changes bump the minor. Anything
 marked `@internal` may change in any release.
 
+## [0.9.0] - 2026-11-09
+
+### Added
+
+- `legacy_query` (default `null`, off): set to a query parameter (`'lang'`), a GET or HEAD of a localized page carrying
+  `?lang=fr` 301s to its `fr` copy, `lang` dropped and every other parameter kept as spelt. The value matches like
+  `Accept-Language` (`fr-FR` and `fr_FR` reach `fr`, `zh_TW` reaches `zh-Hant`); an unknown value, a signed URL, a page
+  outside `Route::localized()` and any other method pass through. Its middleware, `RedirectLegacyQuery`, heads `web`,
+  ahead of the session and any redirect. Nothing to change.
+
 ## [0.8.0] - 2026-10-19
 
 ### Added
@@ -184,6 +194,7 @@ Extracted from laravel-seo 0.4.2 under new names. To upgrade, follow its
 
 - The switcher no longer doubles the base path in apps served from a subdirectory (`/app/app/terms`).
 
+[0.9.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.9.0
 [0.8.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.8.0
 [0.7.1]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.7.1
 [0.7.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.7.0

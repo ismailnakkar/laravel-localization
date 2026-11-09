@@ -55,21 +55,24 @@ final readonly class Locales
     /** Not Symfony's getPreferredLanguage(): it returns en_GB, not en-GB. */
     public function preferredBy(Request $request): ?string
     {
-        $codes = array_combine(array_map(strtolower(...), $this->codes), $this->codes);
-
         foreach ($request->getLanguages() as $language) {
-            $language = strtolower(str_replace('_', '-', $language));
-            $primary = explode('-', $language)[0];
-
-            $match = $codes[$language]
-                ?? $codes[$primary]
-                ?? array_find($codes, static fn (string $code, string $lower): bool => str_starts_with($lower, "{$primary}-"));
-
-            if ($match !== null) {
-                return $match;
+            if (($code = $this->codeFor($language)) !== null) {
+                return $code;
             }
         }
 
         return null;
+    }
+
+    /** A language tag's code (any case, `_` or `-`): exact, else its language's (fr-CA → fr, zh-TW → zh-Hant). */
+    public function codeFor(string $language): ?string
+    {
+        $codes = array_combine(array_map(strtolower(...), $this->codes), $this->codes);
+        $language = strtolower(str_replace('_', '-', $language));
+        $primary = explode('-', $language)[0];
+
+        return $codes[$language]
+            ?? $codes[$primary]
+            ?? array_find($codes, static fn (string $code, string $lower): bool => str_starts_with($lower, "{$primary}-"));
     }
 }

@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Localization\Console\CheckCommand;
 use Localization\Http\ApplyLocale;
+use Localization\Http\RedirectLegacyQuery;
 use Localization\Http\RedirectToDefaultCopy;
 use Localization\Http\ResolveLocale;
 use LogicException;
@@ -44,11 +45,12 @@ final class LocalizationServiceProvider extends ServiceProvider
         $this->publishes([__DIR__ . '/../config/localization.php' => $this->app->configPath('localization.php')], 'localization-config');
         $this->publishesMigrations([__DIR__ . '/../database/migrations/add_locale_to_users_table.php' => $this->app->databasePath('migrations/2026_10_19_000000_add_locale_to_users_table.php')], 'localization-migrations');
 
-        // ResolveLocale after StartSession, so CSRF and auth refusals are translated; ApplyLocale after
-        // AuthenticateSession, as it reads the user. Unconditional: both read the config per request.
-        // Without a `web` group the Kernel throws, as the README promises both join it.
+        // RedirectLegacyQuery first, ahead of the session and any redirect; ResolveLocale after StartSession, so CSRF
+        // and auth refusals are translated; ApplyLocale after AuthenticateSession, as it reads the user. Unconditional:
+        // all three read the config per request. Without a `web` group the Kernel throws, as the README promises them.
         $this->callAfterResolving(Kernel::class, static function (HttpKernel $kernel): void {
-            $kernel->appendMiddlewareToGroup('web', ResolveLocale::class)
+            $kernel->prependMiddlewareToGroup('web', RedirectLegacyQuery::class)
+                ->appendMiddlewareToGroup('web', ResolveLocale::class)
                 ->appendMiddlewareToGroup('web', ApplyLocale::class)
                 ->addToMiddlewarePriorityAfter(StartSession::class, ResolveLocale::class)
                 ->addToMiddlewarePriorityAfter(AuthenticatesSessions::class, ApplyLocale::class);
