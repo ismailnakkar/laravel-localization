@@ -4,6 +4,20 @@ All notable changes are listed here, following [Keep a Changelog](https://keepac
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While 0.x, breaking changes bump the minor. Anything
 marked `@internal` may change in any release.
 
+## [0.10.0] - 2026-11-20
+
+### Added
+
+- `Localization\IntlDate`: `format($date, $skeleton)` prints a date as a browser's `Intl.DateTimeFormat` writes the
+  same fields, in `IntlDate::locale()` and the date's own timezone (an abbreviated zone such as `Z` at its offset), with
+  constants for a day, a date, a month, a date and time (with seconds) and a time, their hours on the locale's own
+  clock. `IntlDate::locale()` is the BCP 47 tag for scripts: the app locale mapped
+  through `date_locales` (default `[]`, the app locale itself), with `numbers` as its `-u-nu-` extension.
+
+### Changed
+
+- Requires `ext-intl`.
+
 ## [0.9.0] - 2026-11-09
 
 ### Added

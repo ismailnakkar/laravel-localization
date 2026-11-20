@@ -1,7 +1,7 @@
 # Laravel Localization
 
-Localized routes and per-visitor language for Laravel: one route serves `/terms` and `/fr/terms`, and a switcher and a
-suggestion banner let visitors pick their language.
+Localized routes and per-visitor language for Laravel: one route serves `/terms` and `/fr/terms`, a switcher and a
+suggestion banner let visitors pick their language, and [dates](#dates) print in it as a browser writes them.
 
 ## Install
 
@@ -21,9 +21,10 @@ php artisan migrate
 
 | Key | Default | |
 |---|---|---|
-| `locales` | `[]` | Language codes, default first. Fewer than two turns everything but `numbers` off. |
+| `locales` | `[]` | Language codes, default first. Fewer than two turns everything but `numbers` and [dates](#dates) off. |
 | `user_locale` | `null` | The users table's language column. `null`: session only. |
-| `numbers` | `null` | An ICU numbering system for Laravel's `Number`, e.g. `'latn'`. `null`: `Number` untouched. |
+| `numbers` | `null` | An ICU numbering system for Laravel's `Number` and [`IntlDate`](#dates), e.g. `'latn'`. `null`: `Number` untouched, dates in the locale's own digits. |
+| `date_locales` | `[]` | App locale => the ICU locale [`IntlDate`](#dates) prints in, e.g. `['en' => 'en-GB']`. Unlisted: the app locale. |
 | `legacy_query` | `null` | The query parameter older URLs carried the language in, e.g. `'lang'`: see [Older `?lang=` URLs](#older-lang-urls). `null`: off. |
 
 Codes are ISO 639-1 plus an optional script and region, cased exactly (`en`, `en-GB`, `zh-Hant`). `es-419` and `fil`
@@ -148,12 +149,69 @@ must exist. `ApplyLocale` must run after your session check:
 - Livewire: add `\Localization\Http\ResolveLocale::class` and `\Localization\Http\ApplyLocale::class` to
   `Livewire::addPersistentMiddleware()`.
 
+## Dates
+
+`Localization\IntlDate::format(CarbonInterface $date, string $skeleton): string` prints a date as a browser's
+`Intl.DateTimeFormat` writes the same fields in the same locale: ICU's best pattern for an ICU skeleton, in
+`IntlDate::locale()` and the date's own timezone. The skeleton names the fields; the locale picks their order, forms,
+punctuation and, for a `j` hour, its own clock. An abbreviated zone (a Carbon parsed from `…Z`, `CEST`) prints at its
+offset. It throws `UnexpectedValueException` when ICU can't format.
+
+`IntlDate::locale()` is the BCP 47 tag dates print in: the app locale, read on every call (a mail's `withLocale()`
+counts), mapped through `date_locales`, hyphenated (Laravel's `pt_BR` is `pt-BR`) and with `numbers` as a `-u-nu-`
+extension. A mapped tag with its own `-u-` extension is used as written. Hand it to your scripts' `Intl.DateTimeFormat`
+(a date picker's `locale`) so their dates read as the server's:
+
+```php
+// config/localization.php: en is en-GB-u-nu-latn, fr is fr-u-nu-latn, ar is ar-u-nu-latn.
+'numbers' => 'latn',
+'date_locales' => ['en' => 'en-GB'],
+```
+
+20 November 2026 at 14:05:09 through each constant, `ar` with `'numbers' => 'latn'`:
+
+| `IntlDate::` | Skeleton | `Intl.DateTimeFormat` options | `en-GB` | `fr` | `es` | `ar` |
+|---|---|---|---|---|---|---|
+| `DAY_AND_MONTH` | `dMMM` | `{day: 'numeric', month: 'short'}` | 20 Nov | 20 nov. | 20 nov | 20 نوفمبر |
+| `DAY_MONTH_AND_YEAR` | `dMMMy` | `DAY_AND_MONTH`'s and `{year: 'numeric'}` | 20 Nov 2026 | 20 nov. 2026 | 20 nov 2026 | 20 نوفمبر 2026 |
+| `MONTH_AND_YEAR` | `yMMMM` | `{month: 'long', year: 'numeric'}` | November 2026 | novembre 2026 | noviembre de 2026 | نوفمبر 2026 |
+| `DATE_AND_TIME` | `dMMMyjm` | `DAY_MONTH_AND_YEAR`'s and `{hour: 'numeric', minute: 'numeric'}` | 20 Nov 2026, 14:05 | 20 nov. 2026, 14:05 | 20 nov 2026, 14:05 | 20 نوفمبر 2026، 2:05 م |
+| `DATE_AND_TIME_WITH_SECONDS` | `dMMMyjms` | `DATE_AND_TIME`'s and `{second: 'numeric'}` | 20 Nov 2026, 14:05:09 | 20 nov. 2026, 14:05:09 | 20 nov 2026, 14:05:09 | 20 نوفمبر 2026، 2:05:09 م |
+| `TIME` | `jm` | `{hour: 'numeric', minute: 'numeric'}` | 14:05 | 14:05 | 14:05 | 2:05 م |
+
+Unmapped, `en` prints US English: "Nov 20, 2026, 2:05 PM". Any other skeleton works too: `'EEEEdMMMM'` is "Friday 20
+November" in `en-GB`.
+
+The server's ICU and the browser's may be releases apart. ICU 74 (Ubuntu 24.04) and Chrome 157 differ on `en`'s space
+before PM (narrow no-break against plain), an `en-GB` weekday ("Fri, 20 Nov" against "Fri 20 Nov") and plain `ar`'s
+digits (Arabic against Latin; `-u-nu-latn` prints Latin on both).
+
+Other packages print dates through their own hooks. Point them here in a service provider's `boot()`, so every date
+reads alike:
+
+```php
+use Carbon\CarbonInterface;
+use Localization\IntlDate;
+use Statistics\Statistics;
+use Subscriptions\Subscriptions;
+use Withdrawals\Withdrawals;
+
+Statistics::dateLocaleUsing(static fn (): string => IntlDate::locale());
+Subscriptions::formatDatesUsing(static fn (CarbonInterface $date): string => IntlDate::format($date, IntlDate::DAY_MONTH_AND_YEAR));
+Withdrawals::formatDatesUsing(static fn (CarbonInterface $at): string => IntlDate::format($at, IntlDate::DATE_AND_TIME));
+```
+
 ## Testing
 
 Nothing to fake: request `/fr/terms` like any URL. Routes read `locales` when they register, so set it before the app
 boots.
 
 ## Upgrading
+
+### From 0.9
+
+- PHP's `intl` extension is required (`IntlDate`; `numbers` already needed it).
+- Nothing else to change: an older published config lacks `date_locales`, which maps nothing.
 
 ### From 0.8
 
