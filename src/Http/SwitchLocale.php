@@ -33,19 +33,23 @@ final class SwitchLocale
 
         UserLocale::save($request->user(), $code);
 
-        $to = $request->input('to');
-        // Strip the base path redirect()->to() re-adds. From getRequestUri(): getBaseUrl() trusts X-Forwarded-Prefix.
-        $path = explode('?', $request->getRequestUri(), 2)[0];
-        $base = substr($path, 0, strlen($path) - strlen($request->getPathInfo()));
-
-        if ($base !== '' && is_string($to) && str_starts_with($to, $base) && in_array(substr($to, strlen($base), 1), ['', '/', '?'], true)) {
-            $to = '/' . ltrim(substr($to, strlen($base)), '/');
-        }
-
-        $target = self::target($request, $to, $code);
+        $target = self::target($request, self::withoutBasePath($request, $request->input('to')), $code);
 
         return redirect()->to(self::isPath($target) ? $target : '/', 303)
             ->withCookie(ResolveLocale::remember($code));
+    }
+
+    /** redirect()->to() adds the base path back. Read from getRequestUri(): getBaseUrl() trusts X-Forwarded-Prefix. */
+    private static function withoutBasePath(Request $request, mixed $to): mixed
+    {
+        $path = explode('?', $request->getRequestUri(), 2)[0];
+        $base = substr($path, 0, strlen($path) - strlen($request->getPathInfo()));
+
+        if ($base === '' || ! is_string($to) || ! str_starts_with($to, $base) || ! in_array(substr($to, strlen($base), 1), ['', '/', '?'], true)) {
+            return $to;
+        }
+
+        return '/' . ltrim(substr($to, strlen($base)), '/');
     }
 
     /** The caller re-checks isPath() on the result. */
@@ -70,14 +74,12 @@ final class SwitchLocale
             return $to;
         }
 
-        if ($probe->query->has('signature')) {
+        if (QueryString::isSigned($probe)) {
             return self::signedAgain($request, $probe, $route, $localized, $code) ?? $to;
         }
 
-        $query = (string)$probe->server->get('QUERY_STRING');
-
         try {
-            return $localized->path($probe->getPathInfo(), $code) . ($query === '' ? '' : "?{$query}");
+            return QueryString::append($localized->path($probe->getPathInfo(), $code), QueryString::of($probe));
         } catch (LogicException) {
             return $to;
         }
@@ -97,14 +99,14 @@ final class SwitchLocale
             return null;
         }
 
-        $expires = $probe->query('expires');
+        $expires = $probe->query(QueryString::EXPIRES);
         $previous = app()->getLocale();
         app()->setLocale($code);
 
         try {
             $signed = app('url')->signedRoute(
                 $name,
-                Arr::only($route->parameters(), $route->parameterNames()) + Arr::except($probe->query(), ['signature', 'expires']),
+                Arr::only($route->parameters(), $route->parameterNames()) + Arr::except($probe->query(), [QueryString::SIGNATURE, QueryString::EXPIRES]),
                 // A Carbon, not an int: an int means seconds from now.
                 is_numeric($expires) ? Carbon::createFromTimestamp((int)$expires) : null,
             );

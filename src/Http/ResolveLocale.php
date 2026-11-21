@@ -17,8 +17,10 @@ final class ResolveLocale
     /** The visitor's choice (switcher or suggestion answer) or a member's account copied in; nothing else. */
     public const string PICKED_KEY = 'localization.picked';
 
-    /** Keeps the choice a year, past the session; set by localization.switch and by signing out. */
+    /** Keeps the choice past the session; set by localization.switch and by signing out. */
     public const string COOKIE = 'localization';
+
+    private const int COOKIE_MINUTES = 60 * 24 * 365;
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -42,13 +44,13 @@ final class ResolveLocale
     /** @internal */
     public static function remember(string $code): Cookie
     {
-        return cookie(self::COOKIE, $code, 60 * 24 * 365);
+        return cookie(self::COOKIE, $code, self::COOKIE_MINUTES);
     }
 
     /** @internal */
     public static function stored(Request $request, Locales $locales): ?string
     {
-        $configured = static fn (mixed $code): ?string => is_string($code) && in_array($code, $locales->codes, true) ? $code : null;
+        $configured = static fn (mixed $code): ?string => $locales->has($code) ? $code : null;
 
         return $configured($request->hasSession() ? $request->session()->get(self::PICKED_KEY) : null)
             ?? $configured($request->cookie(self::COOKIE));

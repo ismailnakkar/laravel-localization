@@ -12,6 +12,7 @@ use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
+use Localization\Http\QueryString;
 use Localization\Http\ResolveLocale;
 
 /** @internal */
@@ -26,10 +27,10 @@ final class UserLocale
         $value = $user->getAttribute(self::column());
         $value = $value instanceof BackedEnum ? $value->value : $value;
 
-        return is_string($value) && in_array($value, $locales->codes, true) ? $value : null;
+        return $locales->has($value) ? $value : null;
     }
 
-    /** @phpstan-assert-if-true Model $user */
+    /** @phpstan-assert-if-true =Model $user */
     public static function hasColumn(mixed $user): bool
     {
         $column = self::column();
@@ -49,7 +50,7 @@ final class UserLocale
         $fresh = $user->newQueryWithoutScopes()->find($user->getKey());
 
         // The row, not $user: a user created this request lacks the column until read back.
-        if (! $fresh instanceof Model || ! array_key_exists($column, $fresh->getAttributes())) {
+        if (! self::hasColumn($fresh)) {
             return;
         }
 
@@ -73,9 +74,10 @@ final class UserLocale
     public static function fillOnSignIn(Login $event): void
     {
         $locales = Locales::configured();
+        $request = request();
         // Only a non-default copy names a language the landing page can't know; that page fills the rest, as this
         // request may lack the choice (a cross-site POST has no SameSite=Lax cookie; outside `web` none was resolved).
-        $code = LocalizedRoute::of(request()->route())?->locale;
+        $code = LocalizedRoute::of($request->route())?->locale;
         $guard = Auth::guard($event->guard);
 
         // Not a remember-me restore (nothing on screen yet; AuthenticateSession may refuse it) or a signed link.
@@ -84,9 +86,9 @@ final class UserLocale
             || $code === null
             || $code === $locales->default
             || self::of($event->user, $locales) !== null
-            || ! in_array($code, $locales->codes, true)
+            || ! $locales->has($code)
             || ($guard instanceof StatefulGuard && $guard->viaRemember())
-            || request()->query->has('signature')
+            || QueryString::isSigned($request)
         ) {
             return;
         }

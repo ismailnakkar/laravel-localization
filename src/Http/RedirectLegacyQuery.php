@@ -21,7 +21,7 @@ final class RedirectLegacyQuery
             ! is_string($key)
             || $localized === null
             || ! ($request->isMethod('GET') || $request->isMethod('HEAD'))
-            || $request->query->has('signature') // its query is what it signs
+            || QueryString::isSigned($request)
         ) {
             return $next($request);
         }
@@ -33,12 +33,12 @@ final class RedirectLegacyQuery
             return $next($request);
         }
 
-        $query = self::withoutParameter((string)$request->server->get('QUERY_STRING'), $key);
+        $query = self::withoutParameter(QueryString::of($request), $key);
 
-        return redirect()->to($localized->path($request->getPathInfo(), $code) . ($query === '' ? '' : "?{$query}"), 301);
+        return redirect()->to(QueryString::append($localized->path($request->getPathInfo(), $code), $query), 301);
     }
 
-    /** As spelt, not rebuilt from query(), which reads `a.b` as `a_b`. */
+    /** Filtered as spelt, not rebuilt from query(), which reads `a.b` as `a_b`. */
     private static function withoutParameter(string $query, string $name): string
     {
         return implode('&', array_filter(explode('&', $query), static fn (string $pair): bool => ! self::names($pair, $name)));

@@ -6,6 +6,7 @@ namespace Localization;
 
 use Closure;
 use Localization\Http\ApplyLocale;
+use Localization\Http\QueryString;
 use Localization\Http\ResolveLocale;
 
 /** Not final: apps mock it. */
@@ -46,15 +47,15 @@ class Localization
         if (
             $locales === null
             || ! $request->hasSession()
-            || $request->query->has('signature')
+            || QueryString::isSigned($request)
             || ApplyLocale::isCrawler($request)
         ) {
             return null;
         }
 
-        // Stored first: ApplyLocale copied in the account POST /locale saves to; a guard swapped later (impersonation)
-        // would suggest a language no answer could store.
-        // Not $request->user(): one bound before the auth provider registered has no user resolver.
+        // The stored choice first: ApplyLocale copied into it the language of the account an answer saves to; the
+        // guard's user may since have been swapped (impersonation), and its language is one no answer could store.
+        // Not $request->user(): a request bound before the auth provider registered has no user resolver.
         $theirs = ResolveLocale::stored($request, $locales) ?? UserLocale::of(auth()->guard()->user(), $locales) ?? $locales->preferredBy($request);
 
         return $theirs === null || $theirs === app()->getLocale() ? null : new Language($theirs, false);

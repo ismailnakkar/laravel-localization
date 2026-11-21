@@ -14,7 +14,17 @@ final readonly class LocalizedRoute
     public const string ACTION = 'localization_locale';
 
     /** @internal */
-    public function __construct(public Locales $locales, public string $locale) {}
+    public function __construct(
+        /** @internal Typed with the internal Locales; the package's middleware and provider read it. */
+        public Locales $locales,
+        public string $locale,
+    ) {}
+
+    /** @internal */
+    public function isDefault(): bool
+    {
+        return $this->locale === $this->locales->default;
+    }
 
     /** null outside Route::localized() */
     public static function of(?Route $route): ?self
@@ -50,13 +60,15 @@ final readonly class LocalizedRoute
     }
 
     /**
+     * @internal Apps read copies()['alternates'][$code].
+     *
      * This copy's $path as $code's: on the fr copy, '/fr/terms' → '/terms' (default en), '/ar/terms' (ar).
      *
      * @throws LogicException
      */
     public function path(string $path, string $code): string
     {
-        $base = $this->locale === $this->locales->default ? $path : self::withoutPrefix($path, $this->locale);
+        $base = $this->isDefault() ? $path : self::withoutPrefix($path, $this->locale);
 
         // One leading slash: browsers read a catch-all's `//host` as a host.
         return $code === $this->locales->default ? '/' . ltrim($base, '/') : '/' . $code . rtrim($base, '/');
@@ -85,7 +97,7 @@ final readonly class LocalizedRoute
     {
         $name = (string)$route->getName();
 
-        if ($this->locale !== $this->locales->default) {
+        if (! $this->isDefault()) {
             $name = Str::replaceFirst("localization.{$this->locale}.", '', $name);
         }
 
@@ -97,7 +109,7 @@ final readonly class LocalizedRoute
     {
         $uri = trim($route->uri(), '/');
 
-        if ($this->locale === $this->locales->default) {
+        if ($this->isDefault()) {
             return $uri;
         }
 

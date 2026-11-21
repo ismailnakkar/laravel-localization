@@ -4,6 +4,14 @@ All notable changes are listed here, following [Keep a Changelog](https://keepac
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While 0.x, breaking changes bump the minor. Anything
 marked `@internal` may change in any release.
 
+## [0.11.0] - 2026-11-21
+
+### Changed
+
+- `LocalizedRoute->path()` is `@internal` and leaves the README: read
+  `LocalizedRoute::copies($route, $path)['alternates'][$code]` instead. `LocalizedRoute->locales`, typed with the
+  internal `Locales`, is `@internal` too.
+
 ## [0.10.0] - 2026-11-20
 
 ### Added
@@ -147,7 +155,7 @@ With laravel-seo installed, update it to 0.6 in the same `composer update`: it n
 
 ## [0.3.0] - 2026-09-28
 
-To upgrade, make the [suggestion banner](https://github.com/ismailnakkar/laravel-localization#account-language)'s
+To upgrade, make the [suggestion banner](https://github.com/ismailnakkar/laravel-localization#suggestion)'s
 second button post the page's language as "Use <language>", remove `remember_locale` from `config/localization.php`,
 and drop references to `ResolveLocale::SESSION_KEY`.
 Members now see the banner too: don't render it while impersonating, where no answer is saved.
@@ -173,7 +181,7 @@ Members now see the banner too: don't render it while impersonating, where no an
 ## [0.2.0] - 2026-09-28
 
 To upgrade, remove `entry_redirect` from `config/localization.php` and replace the account-language modal with the
-[suggestion banner](https://github.com/ismailnakkar/laravel-localization#account-language).
+[suggestion banner](https://github.com/ismailnakkar/laravel-localization#suggestion).
 
 ### Added
 
@@ -208,6 +216,8 @@ Extracted from laravel-seo 0.4.2 under new names. To upgrade, follow its
 
 - The switcher no longer doubles the base path in apps served from a subdirectory (`/app/app/terms`).
 
+[0.11.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.11.0
+[0.10.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.10.0
 [0.9.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.9.0
 [0.8.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.8.0
 [0.7.1]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.7.1

@@ -810,7 +810,7 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->withHeaders(['Sec-Fetch-Site' => 'none', 'Sec-Fetch-Dest' => 'document'])->get('/terms')->assertRedirect('/fr/terms');
     }
 
-    public function test_the_redirect_covers_every_localized_page_whatever_entry_redirect_lists(): void
+    public function test_the_entry_redirect_covers_every_localized_page(): void
     {
         $this->withSession([ResolveLocale::PICKED_KEY => 'fr'])->get('/terms')->assertRedirect('/fr/terms');
         $this->get('/')->assertRedirect('/fr');

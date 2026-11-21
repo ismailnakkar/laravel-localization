@@ -73,7 +73,7 @@ final class ApplyLocale
             || $localized === null
             || $localized->locale !== $locales->default
             || ! ($request->isMethod('GET') || $request->isMethod('HEAD'))
-            || $request->query->has('signature') // a signed URL pins its path
+            || QueryString::isSigned($request)
             || ($request->hasSession() && $request->session()->get(self::DEFAULT_ASKED) === true)
             || self::fromInsideTheSite($request)
             || self::isCrawler($request)
@@ -81,24 +81,25 @@ final class ApplyLocale
             return null;
         }
 
-        $query = (string)$request->server->get('QUERY_STRING');
-
-        return $localized->path($request->getPathInfo(), $known) . ($query === '' ? '' : "?{$query}");
+        return QueryString::append($localized->path($request->getPathInfo(), $known), QueryString::of($request));
     }
 
     /**
-     * Cross-origin: top-level GET only; cookies ride an <img>, iframe or forged POST, and CSRF may run later.
-     * Same-origin or no Fetch Metadata: a page load or the app's fetch (Inertia, wire:navigate), not an <img>/iframe.
-     * Never a signed link (its sender chose the language) or a Livewire update replaying one unsigned.
+     * Never a signed link, nor a Livewire update: it replays the page without its query, signature included.
+     * Same-origin or no Fetch Metadata: a page load or the app's fetch (Inertia, wire:navigate), no <img> or iframe.
+     * Cross-origin: a top-level GET only, as cookies ride an <img>, iframe or forged POST, and CSRF may run later.
      */
     private static function opensThePage(Request $request): bool
     {
+        if (QueryString::isSigned($request) || $request->headers->has('X-Livewire')) {
+            return false;
+        }
+
         $dest = $request->headers->get('Sec-Fetch-Dest');
 
-        return ! $request->query->has('signature') && ! $request->headers->has('X-Livewire')
-            && (in_array($request->headers->get('Sec-Fetch-Site'), [null, 'same-origin'], true)
+        return in_array($request->headers->get('Sec-Fetch-Site'), [null, 'same-origin'], true)
             ? in_array($dest, [null, 'document', 'empty'], true)
-            : $request->isMethod('GET') && $dest === 'document');
+            : $request->isMethod('GET') && $dest === 'document';
     }
 
     /** Referer fallback: Safari before 16.4 and plain HTTP send no Sec-Fetch-Site. */

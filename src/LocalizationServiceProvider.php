@@ -16,15 +16,12 @@ use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
 use Illuminate\Routing\UrlGenerator;
 use Illuminate\Session\Middleware\StartSession;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Localization\Console\CheckCommand;
 use Localization\Http\ApplyLocale;
 use Localization\Http\RedirectLegacyQuery;
-use Localization\Http\RedirectToDefaultCopy;
 use Localization\Http\ResolveLocale;
-use LogicException;
 
 /** @internal */
 final class LocalizationServiceProvider extends ServiceProvider
@@ -47,7 +44,7 @@ final class LocalizationServiceProvider extends ServiceProvider
 
         // RedirectLegacyQuery first, ahead of the session and any redirect; ResolveLocale after StartSession, so CSRF
         // and auth refusals are translated; ApplyLocale after AuthenticateSession, as it reads the user. Unconditional:
-        // all three read the config per request. Without a `web` group the Kernel throws, as the README promises them.
+        // each reads the config per request. Without a `web` group the Kernel throws, as the README promises them.
         $this->callAfterResolving(Kernel::class, static function (HttpKernel $kernel): void {
             $kernel->prependMiddlewareToGroup('web', RedirectLegacyQuery::class)
                 ->appendMiddlewareToGroup('web', ResolveLocale::class)
@@ -68,68 +65,7 @@ final class LocalizationServiceProvider extends ServiceProvider
 
         Router::macro('localized', function (Closure $routes): void {
             /** @var Router $this */
-            $locales = Locales::configured();
-
-            if ($locales === null) {
-                $this->group([], $routes);
-
-                return;
-            }
-
-            $last = Arr::last($this->getGroupStack());
-
-            if (trim($this->getLastGroupPrefix(), '/') !== '' || isset($last[LocalizedRoute::ACTION])) {
-                throw new LogicException('Route::localized() cannot sit inside a prefix group or another Route::localized(): the locale must be the first path segment.');
-            }
-
-            // Plain action key, not Route::metadata(): survives group merging and route:cache on Laravel 12.
-            $marker = static fn (string $code): array => [LocalizedRoute::ACTION => ['codes' => $locales->codes, 'default' => $locales->default, 'locale' => $code]];
-            $others = array_values(array_diff($locales->codes, [$locales->default]));
-            // Laravel 13 lists domain routes first, so copies aren't the tail; holding $before stops object-id reuse.
-            $before = $this->getRoutes()->getRoutes();
-            $seen = array_flip(array_map(spl_object_id(...), $before));
-            $taken = $this->getRoutes()->get('GET');
-
-            foreach ($others as $code) {
-                $this->group($marker($code) + ['prefix' => $code, 'as' => "localization.{$code}."], $routes);
-            }
-
-            // /en/… → /… redirects, built from the first other copy: the default's routes register later.
-            foreach ($this->getRoutes()->getRoutes() as $copy) {
-                $localized = LocalizedRoute::of($copy);
-
-                if (isset($seen[spl_object_id($copy)]) || $localized?->locale !== $others[0] || $copy->isFallback || ! in_array('GET', $copy->methods(), true)) {
-                    continue;
-                }
-
-                $uri = rtrim("{$locales->default}/{$localized->unprefixedUri($copy)}", '/');
-
-                if (isset($taken[$copy->getDomain() . $uri])) {
-                    continue;
-                }
-
-                // Domain in the action: routes are filed by domain on add. Leading `\` escapes `namespace` groups.
-                $this->get($uri, ['uses' => '\\' . RedirectToDefaultCopy::class, RedirectToDefaultCopy::ACTION => $locales->default] + array_filter(['domain' => $copy->getDomain()]))
-                    ->where($copy->wheres);
-            }
-
-            // Default last: first match wins, and its {page} route would catch /fr/… and /en/….
-            $this->group($marker($locales->default), $routes);
-
-            // A route-level ->prefix() lands before the group's; only the finished URIs show it.
-            foreach ($this->getRoutes()->getRoutes() as $route) {
-                $localized = LocalizedRoute::of($route);
-
-                if ($localized === null || $localized->locale === $localized->locales->default) {
-                    continue;
-                }
-
-                $opensWithLocale = $route->uri() === $localized->locale || str_starts_with($route->uri(), "{$localized->locale}/");
-
-                if (! $opensWithLocale) {
-                    throw new LogicException("Route::localized(): [{$route->uri()}] puts the locale after a route-level prefix; wrap the routes in Route::prefix(...)->group() instead.");
-                }
-            }
+            LocalizedRouteRegistrar::register($this, $routes);
         });
 
         $this->callAfterResolving('url', static function (UrlGenerator $url): void {
@@ -138,7 +74,7 @@ final class LocalizationServiceProvider extends ServiceProvider
             $url->formatPathUsing(static function (string $path, ?Route $route = null) use ($previous): string {
                 if (($localized = LocalizedRoute::of($route)) !== null) {
                     $locale = app()->getLocale(); // also set by NotificationSender::withLocale()
-                    $path = $localized->path($path, in_array($locale, $localized->locales->codes, true) ? $locale : $localized->locales->default);
+                    $path = $localized->path($path, $localized->locales->has($locale) ? $locale : $localized->locales->default);
                 }
 
                 return $previous($path, $route);

@@ -64,7 +64,7 @@ final class CheckCommandTest extends TestCase
         $this->assertSame([0, ''], $this->check());
     }
 
-    public function test_two_languages_without_a_redirect_or_an_account_column_print_nothing(): void
+    public function test_two_languages_without_an_account_column_print_nothing(): void
     {
         config(['localization.locales' => ['en', 'fr']]);
 

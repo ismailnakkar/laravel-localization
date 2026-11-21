@@ -21,9 +21,8 @@ final class RedirectToDefaultCopy
         $route = $request->route();
         // One leading slash: `/en//host` must not redirect to `//host`, another host.
         $path = '/' . ltrim(LocalizedRoute::withoutPrefix($request->getPathInfo(), (string)$route->getAction(self::ACTION)), '/');
-        $query = (string)$request->server->get('QUERY_STRING');
 
         // No-cache: a browser-cached 301 would skip ApplyLocale's DEFAULT_ASKED flash.
-        return redirect()->to($path . ($query === '' ? '' : "?{$query}"), 301, ['Cache-Control' => 'no-cache, private']);
+        return redirect()->to(QueryString::append($path, QueryString::of($request)), 301, ['Cache-Control' => 'no-cache, private']);
     }
 }

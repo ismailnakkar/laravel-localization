@@ -3,14 +3,13 @@
 declare(strict_types=1);
 
 return [
-    // e.g. ['en', 'fr', 'zh-Hant']; the first is the unprefixed default. Fewer than two: all but numbers off.
+    // e.g. ['en', 'fr', 'zh-Hant'], default first and unprefixed. Fewer than two: only numbers and date_locales apply.
     'locales' => [],
 
     // User attribute holding their language; null: session only.
     'user_locale' => null,
 
-    // ICU numbering system for Laravel's Number and IntlDate in the page language, e.g. 'latn' (Latin digits in Arabic);
-    // null: off.
+    // ICU numbering system for Laravel's Number and IntlDate, e.g. 'latn' (Latin digits in Arabic); null: off.
     'numbers' => null,
 
     // App locale => ICU locale IntlDate prints in, e.g. ['en' => 'en-GB'] (British dates); unlisted: the app locale.

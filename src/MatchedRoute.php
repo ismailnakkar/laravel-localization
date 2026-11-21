@@ -17,7 +17,7 @@ final class MatchedRoute
 
         app()->setLocale($localized->locale); // Octane: the request's sandbox.
 
-        if ($localized->locale !== $localized->locales->default) {
+        if (! $localized->isDefault()) {
             // Copies are named localization.{code}.… for route:cache; the matched one takes the plain name.
             $event->route->action['as'] = $localized->name($event->route);
         }
