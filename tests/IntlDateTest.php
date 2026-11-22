@@ -29,29 +29,29 @@ final class IntlDateTest extends TestCase
     {
         yield 'en mapped to en-GB' => ['en', ['en' => 'en-GB'], null, 'en-GB', [
             '20 Nov', '20 Nov 2026', 'November 2026',
-            '20 Nov 2026, 14:05', '20 Nov 2026, 14:05:09', '14:05',
+            '20 Nov 2026, 14:05', '14:05',
         ]];
 
         yield 'fr' => ['fr', ['en' => 'en-GB'], null, 'fr', [
             '20 nov.', '20 nov. 2026', 'novembre 2026',
-            '20 nov. 2026, 14:05', '20 nov. 2026, 14:05:09', '14:05',
+            '20 nov. 2026, 14:05', '14:05',
         ]];
 
         yield 'es' => ['es', ['en' => 'en-GB'], null, 'es', [
             '20 nov', '20 nov 2026', 'noviembre de 2026',
-            '20 nov 2026, 14:05', '20 nov 2026, 14:05:09', '14:05',
+            '20 nov 2026, 14:05', '14:05',
         ]];
 
         // Arabic's own clock is 12-hour.
         yield 'ar with Latin digits' => ['ar', ['en' => 'en-GB'], 'latn', 'ar-u-nu-latn', [
             '20 نوفمبر', '20 نوفمبر 2026', 'نوفمبر 2026',
-            '20 نوفمبر 2026، 2:05 م', '20 نوفمبر 2026، 2:05:09 م', '2:05 م',
+            '20 نوفمبر 2026، 2:05 م', '2:05 م',
         ]];
 
         // ICU 74 puts a narrow no-break space before PM: Chrome a plain one.
         yield 'en unmapped' => ['en', [], null, 'en', [
             'Nov 20', 'Nov 20, 2026', 'November 2026',
-            "Nov 20, 2026, 2:05\u{202F}PM", "Nov 20, 2026, 2:05:09\u{202F}PM", "2:05\u{202F}PM",
+            "Nov 20, 2026, 2:05\u{202F}PM", "2:05\u{202F}PM",
         ]];
     }
 
@@ -72,9 +72,34 @@ final class IntlDateTest extends TestCase
             IntlDate::DAY_MONTH_AND_YEAR,
             IntlDate::MONTH_AND_YEAR,
             IntlDate::DATE_AND_TIME,
-            IntlDate::DATE_AND_TIME_WITH_SECONDS,
             IntlDate::TIME,
         ]));
+    }
+
+    public function test_the_named_forms_print_their_constants_and_no_date_as_null(): void
+    {
+        config(['localization.date_locales' => ['en' => 'en-GB']]);
+        $afternoon = CarbonImmutable::parse('2026-11-20 14:05:09', 'UTC');
+
+        $this->assertSame(
+            ['20 Nov 2026', '20 Nov 2026, 14:05', '14:05'],
+            [IntlDate::day($afternoon), IntlDate::dayAndTime($afternoon), IntlDate::time($afternoon)],
+        );
+        $this->assertSame(
+            [null, null, null, null],
+            [IntlDate::day(null), IntlDate::dayAndTime(null), IntlDate::time(null), IntlDate::format(null, IntlDate::DAY_AND_MONTH)],
+        );
+    }
+
+    public function test_zone_names_the_zone_where_the_language_puts_it(): void
+    {
+        config(['localization.date_locales' => ['en' => 'en-GB'], 'localization.numbers' => 'latn']);
+        $afternoon = CarbonImmutable::parse('2026-11-20 14:05:09', 'UTC');
+
+        $this->assertSame('20 Nov 2026, 14:05 UTC', IntlDate::format($afternoon, IntlDate::DATE_AND_TIME . IntlDate::ZONE));
+
+        $this->app->setLocale('ar');
+        $this->assertSame('20 نوفمبر 2026، 2:05 م UTC', IntlDate::format($afternoon, IntlDate::DATE_AND_TIME . IntlDate::ZONE));
     }
 
     public function test_the_locale_follows_set_locale_and_keeps_a_mapped_unicode_extension(): void

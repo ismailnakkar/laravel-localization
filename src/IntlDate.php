@@ -29,22 +29,59 @@ final class IntlDate
     /** DAY_MONTH_AND_YEAR's options and {hour: 'numeric', minute: 'numeric'}: "20 Nov 2026, 14:05" in en-GB. */
     public const string DATE_AND_TIME = 'dMMMyjm';
 
-    /** DATE_AND_TIME's options and {second: 'numeric'}: "20 Nov 2026, 14:05:09" in en-GB. */
-    public const string DATE_AND_TIME_WITH_SECONDS = 'dMMMyjms';
-
     /** {hour: 'numeric', minute: 'numeric'}: "14:05" in en-GB. A time on a day the reader knows. */
     public const string TIME = 'jm';
+
+    /** {timeZoneName: 'short'}, added to a skeleton: DATE_AND_TIME.ZONE is "20 Nov 2026, 14:05 UTC" in en-GB. */
+    public const string ZONE = 'z';
 
     /** @var array<string, IntlDateFormatter> by locale, skeleton and timezone: building one costs far more than using it */
     private static array $formatters = [];
 
     /**
-     * $date with the fields $skeleton names, one of the constants or any ICU skeleton.
+     * DAY_MONTH_AND_YEAR: "20 Nov 2026" in en-GB.
+     *
+     * @return ($date is null ? null : string)
+     */
+    public static function day(?CarbonInterface $date): ?string
+    {
+        return self::format($date, self::DAY_MONTH_AND_YEAR);
+    }
+
+    /**
+     * DATE_AND_TIME: "20 Nov 2026, 14:05" in en-GB.
+     *
+     * @return ($date is null ? null : string)
+     */
+    public static function dayAndTime(?CarbonInterface $date): ?string
+    {
+        return self::format($date, self::DATE_AND_TIME);
+    }
+
+    /**
+     * TIME: "14:05" in en-GB.
+     *
+     * @return ($date is null ? null : string)
+     */
+    public static function time(?CarbonInterface $date): ?string
+    {
+        return self::format($date, self::TIME);
+    }
+
+    /**
+     * $date with the fields $skeleton names, one of the constants or any ICU skeleton. No date prints as null, so the
+     * page words its own fallback: `IntlDate::format($at, …) ?? '—'`.
+     *
+     * @return ($date is null ? null : string)
      *
      * @throws UnexpectedValueException when ICU can't format it
      */
-    public static function format(CarbonInterface $date, string $skeleton): string
+    public static function format(?CarbonInterface $date, string $skeleton): ?string
     {
+        if ($date === null) {
+            return null;
+        }
+
         $locale = self::locale();
         $timezone = self::timezone($date);
         $formatter = self::$formatters["{$locale}|{$skeleton}|{$timezone->getName()}"] ??= new IntlDateFormatter(

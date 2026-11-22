@@ -4,6 +4,20 @@ All notable changes are listed here, following [Keep a Changelog](https://keepac
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While 0.x, breaking changes bump the minor. Anything
 marked `@internal` may change in any release.
 
+## [0.12.0] - 2026-11-22
+
+### Added
+
+- `IntlDate::day()`, `dayAndTime()` and `time()`: the `DAY_MONTH_AND_YEAR`, `DATE_AND_TIME` and `TIME` forms by name.
+  No date (`null`) prints as `null`, so a page words its own fallback (`?? '—'`).
+- `IntlDate::format()` takes `null` too, and returns it.
+- `IntlDate::ZONE` (`{timeZoneName: 'short'}`), added to a skeleton, names the zone where the language puts it:
+  `DATE_AND_TIME.ZONE` is "20 Nov 2026, 14:05 UTC" in `en-GB`. Nothing to change.
+
+### Removed
+
+- `IntlDate::DATE_AND_TIME_WITH_SECONDS`: dates print to the minute. Print `DATE_AND_TIME`, or `dayAndTime()`, instead.
+
 ## [0.11.0] - 2026-11-21
 
 ### Changed
@@ -216,6 +230,7 @@ Extracted from laravel-seo 0.4.2 under new names. To upgrade, follow its
 
 - The switcher no longer doubles the base path in apps served from a subdirectory (`/app/app/terms`).
 
+[0.12.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.12.0
 [0.11.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.11.0
 [0.10.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.10.0
 [0.9.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.9.0
