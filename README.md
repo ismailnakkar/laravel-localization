@@ -276,32 +276,7 @@ here:
 - Your own enum's direction for the offered language (`YourLocale::from($suggestion->code)->dir()`) becomes
   `$suggestion->dir()`.
 
-Hiding the switcher during login-as stays your layout's call. Require `"ismailnakkar/laravel-localization": "^0.13"`,
-then:
-
-- cuty: `app/Providers/AppServiceProvider.php` adds the `readOnlyWhen()` line to `boot()` and drops the
-  `Accounts::impersonating()` early return (and its comment's "Never while viewing as one" sentence) from the
-  `saveUserLocaleUsing()` closure. `resources/views/_partials/language-suggestion.blade.php` opens with
-  `@if ($suggestion = $localization->suggestion())`, prints `dir="{{ $suggestion->dir() }}"` and drops
-  `@use('Accounts\Accounts')` and `@use('App\Enums\Locale')`.
-- exe: `app/Providers/AppServiceProvider.php`'s `boot()` takes `Localization $localization` beside `Seo $seo` and adds
-  the `readOnlyWhen()` line (importing `Accounts\Accounts` and `Localization\Localization`). exe has no saver, so this
-  closes its gap. `resources/views/partials/language-suggestion.blade.php` opens with
-  `@if ($suggestion = $localization->suggestion())`, drops `@php($offered = Locale::from($suggestion->code))`, prints
-  `$suggestion->code` for `$offered->value` and `$suggestion->dir()` for `$offered->dir()`, and drops
-  `@use('Accounts\Accounts')`, `@use('App\Enums\Locale')` and its comment's "not while viewing as a member" clause. The
-  two `language-switcher.blade.php` partials (`resources/views/partials/`, `resources/views/links/partials/`) keep their
-  `@unless (Accounts::impersonating(request()))`.
-- upfiles: `app/Providers/AppServiceProvider.php` adds the `readOnlyWhen()` line to `boot()` and drops the
-  `Accounts::impersonating()` early return from the `saveUserLocaleUsing()` closure, whose comment keeps "A query, not a
-  save, so updated_at stays put". `resources/views/layouts/front.blade.php` wraps the suggestion in
-  `@unless (request()->routeIs('file.*', 'folder.*'))` and drops `@use('Accounts\Accounts')` and its comment's "while an
-  admin is signed in as a member" clause. `resources/views/_partials/language_suggestion.blade.php` drops
-  `$theirs = Locale::from($suggestion->code)` and prints `$suggestion->code` for `$theirs->value` and
-  `$suggestion->dir()` for `$theirs->dir()`.
-
-Pages print the same in all three: each offers `en`, `fr`, `ar` and `es`, and `dir()` is `rtl` for `ar` alone, as their
-enums are.
+Hiding the switcher during login-as stays your layout's call. Require `"ismailnakkar/laravel-localization": "^0.13"`.
 
 ### From 0.11
 
