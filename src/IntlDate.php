@@ -12,71 +12,22 @@ use UnexpectedValueException;
 
 /**
  * A date as a browser's Intl.DateTimeFormat writes the same fields in the same locale: ICU's best pattern for a
- * skeleton, in IntlDate::locale() and the date's own timezone. A skeleton names the fields only; the locale picks their
- * order, forms, punctuation and, for a `j` hour, its own clock.
+ * DateForm, in IntlDate::locale() and the date's own timezone.
  */
 final class IntlDate
 {
-    /** {day: 'numeric', month: 'short'}: "20 Nov" in en-GB. */
-    public const string DAY_AND_MONTH = 'dMMM';
-
-    /** {day: 'numeric', month: 'short', year: 'numeric'}: "20 Nov 2026" in en-GB. */
-    public const string DAY_MONTH_AND_YEAR = 'dMMMy';
-
-    /** {month: 'long', year: 'numeric'}: "November 2026" in en-GB. */
-    public const string MONTH_AND_YEAR = 'yMMMM';
-
-    /** DAY_MONTH_AND_YEAR's options and {hour: 'numeric', minute: 'numeric'}: "20 Nov 2026, 14:05" in en-GB. */
-    public const string DATE_AND_TIME = 'dMMMyjm';
-
-    /** {hour: 'numeric', minute: 'numeric'}: "14:05" in en-GB. A time on a day the reader knows. */
-    public const string TIME = 'jm';
-
-    /** {timeZoneName: 'short'}, added to a skeleton: DATE_AND_TIME.ZONE is "20 Nov 2026, 14:05 UTC" in en-GB. */
-    public const string ZONE = 'z';
-
-    /** @var array<string, IntlDateFormatter> by locale, skeleton and timezone: building one costs far more than using it */
+    /** @var array<string, IntlDateFormatter> by locale, form and timezone: building one costs far more than using it */
     private static array $formatters = [];
 
     /**
-     * DAY_MONTH_AND_YEAR: "20 Nov 2026" in en-GB.
-     *
-     * @return ($date is null ? null : string)
-     */
-    public static function day(?CarbonInterface $date): ?string
-    {
-        return self::format($date, self::DAY_MONTH_AND_YEAR);
-    }
-
-    /**
-     * DATE_AND_TIME: "20 Nov 2026, 14:05" in en-GB.
-     *
-     * @return ($date is null ? null : string)
-     */
-    public static function dayAndTime(?CarbonInterface $date): ?string
-    {
-        return self::format($date, self::DATE_AND_TIME);
-    }
-
-    /**
-     * TIME: "14:05" in en-GB.
-     *
-     * @return ($date is null ? null : string)
-     */
-    public static function time(?CarbonInterface $date): ?string
-    {
-        return self::format($date, self::TIME);
-    }
-
-    /**
-     * $date with the fields $skeleton names, one of the constants or any ICU skeleton. No date prints as null, so the
-     * page words its own fallback: `IntlDate::format($at, …) ?? '—'`.
+     * $date in $form. No date prints as null, so the page words its own fallback:
+     * `IntlDate::format($at, DateForm::dayAndTime) ?? '—'`.
      *
      * @return ($date is null ? null : string)
      *
      * @throws UnexpectedValueException when ICU can't format it
      */
-    public static function format(?CarbonInterface $date, string $skeleton): ?string
+    public static function format(?CarbonInterface $date, DateForm $form): ?string
     {
         if ($date === null) {
             return null;
@@ -84,16 +35,14 @@ final class IntlDate
 
         $locale = self::locale();
         $timezone = self::timezone($date);
-        $formatter = self::$formatters["{$locale}|{$skeleton}|{$timezone->getName()}"] ??= new IntlDateFormatter(
+        $formatter = self::$formatters["{$locale}|{$form->name}|{$timezone->getName()}"] ??= new IntlDateFormatter(
             $locale,
             IntlDateFormatter::NONE,
             IntlDateFormatter::NONE,
             $timezone,
             IntlDateFormatter::GREGORIAN,
-            new IntlDatePatternGenerator($locale)->getBestPattern($skeleton) ?: throw new UnexpectedValueException("ICU has no pattern for {$skeleton} in {$locale}."),
+            new IntlDatePatternGenerator($locale)->getBestPattern($form->skeleton()) ?: throw new UnexpectedValueException("ICU has no pattern for {$form->name} in {$locale}."),
         );
-
-        // Only false fails: a minute or second skeleton prints "0" on the hour.
         $formatted = $formatter->format($date);
 
         return $formatted !== false ? $formatted : throw new UnexpectedValueException($formatter->getErrorMessage());

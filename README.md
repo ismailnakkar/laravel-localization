@@ -144,12 +144,12 @@ $localization->saveUserLocaleUsing(fn (User $user, string $code) => app(Users::c
 
 ## Dates
 
-`Localization\IntlDate::format(?CarbonInterface $date, string $skeleton): ?string` prints a date as a browser's
-`Intl.DateTimeFormat` writes the same fields in the same locale: ICU's best pattern for an ICU skeleton, in
-`IntlDate::locale()` and the date's own timezone. The skeleton names the fields; the locale picks their order, forms,
-punctuation and, for a `j` hour, its own clock. An abbreviated zone (a Carbon parsed from `…Z`, `CEST`) prints at its
-offset. No date (`null`) prints as `null`, so the page words its own fallback: `IntlDate::dayAndTime($at) ?? '—'`. It
-throws `UnexpectedValueException` when ICU can't format.
+`Localization\IntlDate::format(?CarbonInterface $date, DateForm $form): ?string` prints a date as a browser's
+`Intl.DateTimeFormat` writes the same fields in the same locale: ICU's best pattern for the form, in
+`IntlDate::locale()` and the date's own timezone. The form names the fields; the locale picks their order, forms,
+punctuation and, for an hour, its own clock. An abbreviated zone (a Carbon parsed from `…Z`, `CEST`) prints at its
+offset. No date (`null`) prints as `null`, so the page words its own fallback:
+`IntlDate::format($at, DateForm::dayAndTime) ?? '—'`. It throws `UnexpectedValueException` when ICU can't format.
 
 `IntlDate::locale()` is the BCP 47 tag dates print in: the app locale, read on every call (a mail's `withLocale()`
 counts), mapped through `date_locales`, hyphenated (Laravel's `pt_BR` is `pt-BR`) and with `numbers` as a `-u-nu-`
@@ -162,40 +162,37 @@ extension. A mapped tag with its own `-u-` extension is used as written. Hand it
 'date_locales' => ['en' => 'en-GB'],
 ```
 
-20 November 2026 at 14:05:09 through each constant, and the named form that prints it (`IntlDate::day($date)`),
-`ar` with `'numbers' => 'latn'`:
+20 November 2026 at 14:05:09 UTC in each `Localization\DateForm`, `ar` with `'numbers' => 'latn'`:
 
-| `IntlDate::` | Named form | Skeleton | `Intl.DateTimeFormat` options | `en-GB` | `fr` | `es` | `ar` |
-|---|---|---|---|---|---|---|---|
-| `DAY_AND_MONTH` | | `dMMM` | `{day: 'numeric', month: 'short'}` | 20 Nov | 20 nov. | 20 nov | 20 نوفمبر |
-| `DAY_MONTH_AND_YEAR` | `day()` | `dMMMy` | `DAY_AND_MONTH`'s and `{year: 'numeric'}` | 20 Nov 2026 | 20 nov. 2026 | 20 nov 2026 | 20 نوفمبر 2026 |
-| `MONTH_AND_YEAR` | | `yMMMM` | `{month: 'long', year: 'numeric'}` | November 2026 | novembre 2026 | noviembre de 2026 | نوفمبر 2026 |
-| `DATE_AND_TIME` | `dayAndTime()` | `dMMMyjm` | `DAY_MONTH_AND_YEAR`'s and `{hour: 'numeric', minute: 'numeric'}` | 20 Nov 2026, 14:05 | 20 nov. 2026, 14:05 | 20 nov 2026, 14:05 | 20 نوفمبر 2026، 2:05 م |
-| `TIME` | `time()` | `jm` | `{hour: 'numeric', minute: 'numeric'}` | 14:05 | 14:05 | 14:05 | 2:05 م |
+| `DateForm::` | `Intl.DateTimeFormat` options | `en-GB` | `fr` | `es` | `ar` |
+|---|---|---|---|---|---|
+| `day` | `{day: 'numeric', month: 'short', year: 'numeric'}` | 20 Nov 2026 | 20 nov. 2026 | 20 nov 2026 | 20 نوفمبر 2026 |
+| `monthAndYear` | `{month: 'long', year: 'numeric'}` | November 2026 | novembre 2026 | noviembre de 2026 | نوفمبر 2026 |
+| `dayAndTime` | `day`'s and `{hour: 'numeric', minute: 'numeric'}` | 20 Nov 2026, 14:05 | 20 nov. 2026, 14:05 | 20 nov 2026, 14:05 | 20 نوفمبر 2026، 2:05 م |
+| `dayTimeAndZone` | `dayAndTime`'s and `{timeZoneName: 'short'}` | 20 Nov 2026, 14:05 UTC | 20 nov. 2026, 14:05 UTC | 20 nov 2026, 14:05 UTC | 20 نوفمبر 2026، 2:05 م UTC |
+| `time` | `{hour: 'numeric', minute: 'numeric'}` | 14:05 | 14:05 | 14:05 | 2:05 م |
 
-Unmapped, `en` prints US English: "Nov 20, 2026, 2:05 PM". Any other skeleton works too: `'EEEEdMMMM'` is "Friday 20
-November" in `en-GB`. Add `IntlDate::ZONE` (`{timeZoneName: 'short'}`) to one to name the zone where the language puts
-it, rather than appending it: `IntlDate::format($at->utc(), IntlDate::DATE_AND_TIME . IntlDate::ZONE)` is "20 Nov 2026,
-14:05 UTC", and "20 نوفمبر 2026، 2:05 م UTC" in `ar`. A region prints the language's short name ("CET" in `en-GB`,
-"UTC+1" in `fr`).
+Unmapped, `en` prints US English: "Nov 20, 2026, 2:05 PM". `dayTimeAndZone` names the zone where the language puts it;
+a region prints the language's short name ("CET" in `en-GB`, "UTC+1" in `fr`).
 
 The server's ICU and the browser's may be releases apart. ICU 74 (Ubuntu 24.04) and Chrome 157 differ on `en`'s space
-before PM (narrow no-break against plain), an `en-GB` weekday ("Fri, 20 Nov" against "Fri 20 Nov") and plain `ar`'s
-digits (Arabic against Latin; `-u-nu-latn` prints Latin on both).
+before PM (narrow no-break against plain) and plain `ar`'s digits (Arabic against Latin; `-u-nu-latn` prints Latin on
+both).
 
 Other packages print dates through their own hooks. Point them here in a service provider's `boot()`, so every date
 reads alike:
 
 ```php
 use Carbon\CarbonInterface;
+use Localization\DateForm;
 use Localization\IntlDate;
 use Statistics\Statistics;
 use Subscriptions\Subscriptions;
 use Withdrawals\Withdrawals;
 
 Statistics::dateLocaleUsing(static fn (): string => IntlDate::locale());
-Subscriptions::formatDatesUsing(static fn (CarbonInterface $date): string => IntlDate::day($date));
-Withdrawals::formatDatesUsing(static fn (CarbonInterface $at): string => IntlDate::dayAndTime($at));
+Subscriptions::formatDatesUsing(static fn (CarbonInterface $date): string => IntlDate::format($date, DateForm::day));
+Withdrawals::formatDatesUsing(static fn (CarbonInterface $at): string => IntlDate::format($at, DateForm::dayAndTime));
 ```
 
 ## Older `?lang=` URLs
@@ -244,7 +241,7 @@ The package adds three middleware to your `web` group, which must exist:
 | `$localization->readOnlyWhen(Closure)` | [Read-only requests](#read-only-requests): no account save, no suggestion. |
 | `Language` | `code`; `current`, whether it is the page's language (always `false` for a suggestion); `dir()`, `rtl` or `ltr`. |
 | `LocalizedRoute::of()`, `::copies()` | [A page's path in each language](#a-pages-path-in-each-language). |
-| `IntlDate::format()`, `::day()`, `::dayAndTime()`, `::time()`, `::locale()`, constants | [Dates](#dates). |
+| `IntlDate::format()`, `IntlDate::locale()`, `DateForm` | [Dates](#dates). |
 | `POST /locale` (`localization.switch`) | The switcher: `locale`, and `to`, the page to return to. |
 | `ResolveLocale::PICKED_KEY`, `ResolveLocale::COOKIE` | The session key and cookie holding the choice. |
 | `RedirectLegacyQuery`, `ResolveLocale`, `ApplyLocale` | The [middleware](#middleware), in `Localization\Http`. |
@@ -259,6 +256,23 @@ language. A visitor who chose a language is `withSession([ResolveLocale::PICKED_
 `withCookie(ResolveLocale::COOKIE, 'fr')`.
 
 ## Upgrading
+
+### From 0.13
+
+`IntlDate::format()` takes a `Localization\DateForm`. The named forms, the constants and skeleton strings are removed;
+each form prints as before:
+
+| 0.13 | 0.14 |
+|---|---|
+| `IntlDate::day($at)`, `IntlDate::format($at, IntlDate::DAY_MONTH_AND_YEAR)` | `IntlDate::format($at, DateForm::day)` |
+| `IntlDate::format($at, IntlDate::MONTH_AND_YEAR)` | `IntlDate::format($at, DateForm::monthAndYear)` |
+| `IntlDate::dayAndTime($at)`, `IntlDate::format($at, IntlDate::DATE_AND_TIME)` | `IntlDate::format($at, DateForm::dayAndTime)` |
+| `IntlDate::format($at, IntlDate::DATE_AND_TIME . IntlDate::ZONE)` | `IntlDate::format($at, DateForm::dayTimeAndZone)` |
+| `IntlDate::time($at)`, `IntlDate::format($at, IntlDate::TIME)` | `IntlDate::format($at, DateForm::time)` |
+
+`IntlDate::DAY_AND_MONTH`, `ZONE` added to another form, and any other skeleton have no form: a page that prints one
+uses its own `IntlDateFormatter`. Import `Localization\DateForm` (`@use('Localization\DateForm')` in Blade) and require
+`"ismailnakkar/laravel-localization": "^0.14"`.
 
 ### From 0.12
 
