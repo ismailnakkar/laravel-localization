@@ -4,6 +4,21 @@ All notable changes are listed here, following [Keep a Changelog](https://keepac
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While 0.x, breaking changes bump the minor. Anything
 marked `@internal` may change in any release.
 
+## [0.13.0] - 2026-11-23
+
+### Added
+
+- `Localization::readOnlyWhen(Closure $readOnly)`: while `$readOnly(Request $request)` returns `true` (an admin viewing
+  as a member), the account's language is never saved, through a fill, a sign-in or the switcher, and `suggestion()` is
+  `null`. Without it nothing is read-only. Nothing to change.
+- `Language::dir()`: `rtl` for a right-to-left language (`ar`, `he`, `pa-Arab`), else `ltr`, for the suggestion's
+  `dir` attribute.
+
+### Changed
+
+- Requires `symfony/polyfill-php85` `^1.34` (`locale_is_right_to_left()` on PHP 8.4), which both supported Laravel
+  floors already install.
+
 ## [0.12.0] - 2026-11-22
 
 ### Added
@@ -230,6 +245,7 @@ Extracted from laravel-seo 0.4.2 under new names. To upgrade, follow its
 
 - The switcher no longer doubles the base path in apps served from a subdirectory (`/app/app/terms`).
 
+[0.13.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.13.0
 [0.12.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.12.0
 [0.11.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.11.0
 [0.10.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.10.0

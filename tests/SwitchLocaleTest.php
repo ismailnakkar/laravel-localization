@@ -21,7 +21,7 @@ final class SwitchLocaleTest extends LanguagesTestCase
     private const string BANNER = <<<'BLADE'
         @inject('localization', \Localization\Localization::class)
         @if ($suggestion = $localization->suggestion())
-            <aside lang="{{ $suggestion->code }}">
+            <aside lang="{{ $suggestion->code }}" dir="{{ $suggestion->dir() }}">
                 <form method="POST" action="{{ route('localization.switch') }}">
                     @csrf
                     <input type="hidden" name="to" value="{{ request()->getRequestUri() }}">
@@ -470,7 +470,7 @@ final class SwitchLocaleTest extends LanguagesTestCase
         $user = User::create(['name' => 'member', 'locale' => 'en']);
 
         $this->actingAs($user)->get('/fr/banner')->assertOk()
-            ->assertSee('<aside lang="en">', false)
+            ->assertSee('<aside lang="en" dir="ltr">', false)
             ->assertSee('<input type="hidden" name="to" value="/fr/banner">', false)
             ->assertSee('<p>Show this site in English?</p>', false)
             ->assertSee('<button name="locale" value="en">Yes</button>', false)
@@ -483,13 +483,45 @@ final class SwitchLocaleTest extends LanguagesTestCase
         $this->get('/fr/banner')->assertContent('fr');
     }
 
+    public function test_while_read_only_no_banner_shows_and_a_switch_keeps_the_choice_off_the_account(): void
+    {
+        $this->translateTheBanner();
+        $user = User::create(['name' => 'member', 'locale' => 'en']);
+        $this->localization()->readOnlyWhen(static fn (Request $request): bool => $request->session()->has('viewing_as'));
+
+        $this->actingAs($user)->withSession(['viewing_as' => 1])->get('/fr/banner')->assertOk()->assertContent('fr');
+
+        $this->post('/locale', ['locale' => 'fr', 'to' => '/fr/banner'])->assertRedirect('/fr/banner')->assertCookie(ResolveLocale::COOKIE, 'fr');
+
+        $this->assertSame('fr', session(ResolveLocale::PICKED_KEY));
+        $this->assertSame('en', $user->fresh()?->locale);
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function directions(): iterable
+    {
+        foreach (['ar', 'he', 'fa', 'ur', 'pa-Arab'] as $code) {
+            yield $code => [$code, 'rtl'];
+        }
+
+        foreach (['en', 'fr', 'zh-Hant', 'pt-BR'] as $code) {
+            yield $code => [$code, 'ltr'];
+        }
+    }
+
+    #[DataProvider('directions')]
+    public function test_a_language_names_its_writing_direction(string $code, string $dir): void
+    {
+        $this->assertSame($dir, new Language($code, false)->dir());
+    }
+
     public function test_yes_on_the_readme_banner_opens_their_language_and_saves_it(): void
     {
         $this->translateTheBanner();
         $this->withHeader('Accept-Language', 'fr');
 
         $this->get('/banner')->assertOk()
-            ->assertSee('<aside lang="fr">', false)
+            ->assertSee('<aside lang="fr" dir="ltr">', false)
             ->assertSee('<p>Afficher ce site en français ?</p>', false)
             ->assertSee('<button name="locale" value="fr">Oui</button>', false)
             ->assertSee('<button name="locale" value="en">Utiliser English</button>', false);
@@ -505,7 +537,7 @@ final class SwitchLocaleTest extends LanguagesTestCase
         $this->translateTheBanner();
         $this->withHeader('Accept-Language', 'fr');
 
-        $this->get('/banner')->assertSee('<aside lang="fr">', false);
+        $this->get('/banner')->assertSee('<aside lang="fr" dir="ltr">', false);
         $this->post('/locale', ['locale' => 'en', 'to' => '/banner'])->assertRedirect('/banner');
 
         $this->assertSame('en', session(ResolveLocale::PICKED_KEY));

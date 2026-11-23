@@ -643,6 +643,32 @@ final class ResolveLocaleTest extends LanguagesTestCase
         $this->assertSame('ar', $admin->fresh()?->locale);
     }
 
+    public function test_while_read_only_neither_a_page_view_nor_a_sign_in_fills_an_account(): void
+    {
+        $admin = User::create(['name' => 'admin', 'locale' => null]);
+        $member = User::create(['name' => 'member', 'locale' => null]);
+        $readOnly = true;
+        $asked = [];
+        $this->localization()->readOnlyWhen(static function (Request $request) use (&$readOnly, &$asked): bool {
+            $asked[] = $request->path();
+
+            return $readOnly;
+        });
+
+        // Login-as swaps the member in after ApplyLocale ran, which would fill the admin's own empty language.
+        $this->actingAs($admin)->get("/fr/login-as/{$member->id}")->assertOk()->assertContent('fr');
+        $this->post('/fr/sign-in')->assertOk()->assertContent('fr');
+
+        $this->assertNull($admin->fresh()?->locale);
+        $this->assertNull($member->fresh()?->locale);
+        $this->assertSame(["fr/login-as/{$member->id}", 'fr/sign-in'], $asked);
+
+        $readOnly = false;
+        $this->get('/es/terms')->assertContent('es');
+
+        $this->assertSame('es', $member->fresh()?->locale);
+    }
+
     public function test_a_failed_fill_is_reported_and_the_page_still_served(): void
     {
         $user = User::create(['name' => 'member', 'locale' => null]);

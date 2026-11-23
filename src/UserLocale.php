@@ -38,12 +38,15 @@ final class UserLocale
         return $column !== null && $user instanceof Model && array_key_exists($column, $user->getAttributes());
     }
 
-    /** Without a saver, saves a fresh copy so events fire. $unlessSet checks the row, as $user may be stale. */
+    /**
+     * Without a saver, saves a fresh copy so events fire. $unlessSet checks the row, as $user may be stale. Never while
+     * read-only: every write (a fill, a sign-in, a switch) comes through here.
+     */
     public static function save(mixed $user, string $code, ?Locales $unlessSet = null): void
     {
         $column = self::column();
 
-        if ($column === null || ! $user instanceof Model) {
+        if ($column === null || ! $user instanceof Model || app(Localization::class)->isReadOnly()) {
             return;
         }
 

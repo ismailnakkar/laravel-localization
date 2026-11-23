@@ -87,13 +87,14 @@ unchanged. Label each language in itself (`'fr' => 'Français'` in `lang/fr/lang
 
 ### Suggestion
 
-Anyone whose language differs from the page's gets one, except on signed pages and for crawlers. Render it in your
-layout, not in error views. Either answer is kept like a switcher choice, so the banner goes:
+Anyone whose language differs from the page's gets one, except on signed pages, for crawlers and on
+[read-only requests](#read-only-requests). Render it in your layout, not in error views. Either answer is kept like a
+switcher choice, so the banner goes:
 
 ```blade
 @inject('localization', \Localization\Localization::class)
 @if ($suggestion = $localization->suggestion())
-    <aside lang="{{ $suggestion->code }}">
+    <aside lang="{{ $suggestion->code }}" dir="{{ $suggestion->dir() }}">
         <form method="POST" action="{{ route('localization.switch') }}">
             @csrf
             <input type="hidden" name="to" value="{{ request()->getRequestUri() }}">
@@ -105,8 +106,21 @@ layout, not in error views. Either answer is kept like a switcher choice, so the
 @endif
 ```
 
-Don't render it while impersonating: your saver skips the save then (see [Account language](#account-language)), so
-the banner would never go.
+Its `dir()` is `rtl` for a right-to-left language (`ar`, `he`, a code in an RTL script such as `pa-Arab`), else `ltr`.
+
+### Read-only requests
+
+While an admin views the site as a member, nothing should write to an account, and an answer to the banner could not
+be kept, so it would never go. Name those requests in a service provider's `boot(Localization $localization)`, here
+laravel-accounts' login-as:
+
+```php
+$localization->readOnlyWhen(\Accounts\Accounts::impersonating(...));
+```
+
+While the closure, `fn (Request $request): bool`, returns `true`, the account's language is never saved (no fill, no
+sign-in fill, no switcher save) and `suggestion()` is `null`. The switcher still keeps a choice in the session and the
+cookie, where an account's language outranks it: hiding it too is your layout's call.
 
 ## Account language
 
@@ -122,7 +136,7 @@ With `user_locale` set:
 
 The package saves the column on a fresh copy of the model, so model events fire. To save it your own way, call this in
 a service provider's `boot(Localization $localization)`. The closure gets the signed-in model of any guard whose row
-has the column (type-hint accordingly) and must return early while impersonating:
+has the column (type-hint accordingly), and is never called while [read-only](#read-only-requests):
 
 ```php
 $localization->saveUserLocaleUsing(fn (User $user, string $code) => app(Users::class)->setLocale($user, $code));
@@ -227,7 +241,8 @@ The package adds three middleware to your `web` group, which must exist:
 | `$localization->languages()` | Every configured `Language`, in config order; `[]` below two. |
 | `$localization->suggestion()` | The visitor's `Language` while the page is in another, else `null`. |
 | `$localization->saveUserLocaleUsing(Closure)` | Saves the account's language your own way. |
-| `Language` | `code`, and `current`: whether it is the page's language (always `false` for a suggestion). |
+| `$localization->readOnlyWhen(Closure)` | [Read-only requests](#read-only-requests): no account save, no suggestion. |
+| `Language` | `code`; `current`, whether it is the page's language (always `false` for a suggestion); `dir()`, `rtl` or `ltr`. |
 | `LocalizedRoute::of()`, `::copies()` | [A page's path in each language](#a-pages-path-in-each-language). |
 | `IntlDate::format()`, `::day()`, `::dayAndTime()`, `::time()`, `::locale()`, constants | [Dates](#dates). |
 | `POST /locale` (`localization.switch`) | The switcher: `locale`, and `to`, the page to return to. |
@@ -244,6 +259,49 @@ language. A visitor who chose a language is `withSession([ResolveLocale::PICKED_
 `withCookie(ResolveLocale::COOKIE, 'fr')`.
 
 ## Upgrading
+
+### From 0.12
+
+0.13 requires `symfony/polyfill-php85` `^1.34`, for `locale_is_right_to_left()` on PHP 8.4. Laravel 12.61.1+ and 13.12+
+already install it, so an app changes nothing for it.
+
+Nothing else breaks: without `readOnlyWhen()` nothing is read-only. An app that kept login-as read-only itself moves it
+here:
+
+- Add `$localization->readOnlyWhen(Accounts::impersonating(...));` (or your own check) to a service provider's
+  `boot(Localization $localization)`. Without it, and without a saver that skips login-as, a page view during login-as
+  fills the admin's own empty language.
+- Drop the impersonation early return from your `saveUserLocaleUsing()` closure.
+- Drop the impersonation condition around the suggestion banner, in its partial or in the layout that includes it.
+- Your own enum's direction for the offered language (`YourLocale::from($suggestion->code)->dir()`) becomes
+  `$suggestion->dir()`.
+
+Hiding the switcher during login-as stays your layout's call. Require `"ismailnakkar/laravel-localization": "^0.13"`,
+then:
+
+- cuty: `app/Providers/AppServiceProvider.php` adds the `readOnlyWhen()` line to `boot()` and drops the
+  `Accounts::impersonating()` early return (and its comment's "Never while viewing as one" sentence) from the
+  `saveUserLocaleUsing()` closure. `resources/views/_partials/language-suggestion.blade.php` opens with
+  `@if ($suggestion = $localization->suggestion())`, prints `dir="{{ $suggestion->dir() }}"` and drops
+  `@use('Accounts\Accounts')` and `@use('App\Enums\Locale')`.
+- exe: `app/Providers/AppServiceProvider.php`'s `boot()` takes `Localization $localization` beside `Seo $seo` and adds
+  the `readOnlyWhen()` line (importing `Accounts\Accounts` and `Localization\Localization`). exe has no saver, so this
+  closes its gap. `resources/views/partials/language-suggestion.blade.php` opens with
+  `@if ($suggestion = $localization->suggestion())`, drops `@php($offered = Locale::from($suggestion->code))`, prints
+  `$suggestion->code` for `$offered->value` and `$suggestion->dir()` for `$offered->dir()`, and drops
+  `@use('Accounts\Accounts')`, `@use('App\Enums\Locale')` and its comment's "not while viewing as a member" clause. The
+  two `language-switcher.blade.php` partials (`resources/views/partials/`, `resources/views/links/partials/`) keep their
+  `@unless (Accounts::impersonating(request()))`.
+- upfiles: `app/Providers/AppServiceProvider.php` adds the `readOnlyWhen()` line to `boot()` and drops the
+  `Accounts::impersonating()` early return from the `saveUserLocaleUsing()` closure, whose comment keeps "A query, not a
+  save, so updated_at stays put". `resources/views/layouts/front.blade.php` wraps the suggestion in
+  `@unless (request()->routeIs('file.*', 'folder.*'))` and drops `@use('Accounts\Accounts')` and its comment's "while an
+  admin is signed in as a member" clause. `resources/views/_partials/language_suggestion.blade.php` drops
+  `$theirs = Locale::from($suggestion->code)` and prints `$suggestion->code` for `$theirs->value` and
+  `$suggestion->dir()` for `$theirs->dir()`.
+
+Pages print the same in all three: each offers `en`, `fr`, `ar` and `es`, and `dir()` is `rtl` for `ar` alone, as their
+enums are.
 
 ### From 0.11
 

@@ -8,4 +8,15 @@ namespace Localization;
 final readonly class Language
 {
     public function __construct(public string $code, public bool $current) {}
+
+    /**
+     * The language's writing direction, for an element's `dir`: `rtl` for `ar`, `he`, `fa`, `ur`, a code in an RTL
+     * script (`pa-Arab`) and the like.
+     *
+     * @return 'rtl'|'ltr'
+     */
+    public function dir(): string
+    {
+        return locale_is_right_to_left($this->code) ? 'rtl' : 'ltr';
+    }
 }
