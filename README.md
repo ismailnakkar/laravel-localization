@@ -291,17 +291,11 @@ language. A visitor who chose a language is `withSession([ResolveLocale::PICKED_
 
 ### From 0.14
 
-Nothing to change. An app can delete what the package now does:
-
-- Its own language names and directions. A language enum whose `label()` returns
-  `mb_ucfirst(\Locale::getDisplayName($code, $code))` and whose `dir()` reads `locale_is_right_to_left()` returns
-  `Language::of($this)->name()` and `Language::of($this)->dir()` (import `Localization\Language`). The names print as
-  before, except that a name opening with a lower-case prefix keeps it: `isiZulu`, not `IsiZulu`.
-- Its fallback route's lines that set the locale from the path's first segment, and the imports only they used. A path
-  no route matches, or only `Route::fallback()` does, now renders in its first segment's language when that is a code
-  other than the default, in `web` or not, where it rendered in `config('app.locale')` or the visitor's language; on a
-  fallback in `web`, an account without a language fills with it, as on a copy. `/en/missing`, the default's code,
-  renders like `/missing`: an app whose lines set the default for it too sees that one case change.
+Nothing to change. New: `Language::of($code)`, any code's or a string-backed enum case's `Language`, and
+`Language::name()`, the language named in itself. One behaviour changes: a path no route matches, or only
+`Route::fallback()` does, now renders in its first segment's language when that is a code other than the default, in
+`web` or not, where it rendered in `config('app.locale')` or the visitor's language; on a fallback in `web`, an account
+without a language fills with it, as on a copy. `/en/missing`, the default's code, renders like `/missing`.
 
 Require `"ismailnakkar/laravel-localization": "^0.15"`.
 
