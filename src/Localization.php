@@ -45,13 +45,7 @@ class Localization
     {
         $locales = Locales::configured();
 
-        if ($locales === null) {
-            return [];
-        }
-
-        $current = app()->getLocale();
-
-        return array_map(static fn (string $code): Language => new Language($code, $code === $current), $locales->codes);
+        return $locales === null ? [] : array_map(Language::of(...), $locales->codes);
     }
 
     /**

@@ -1,0 +1,1 @@
+<html lang="{{ app()->getLocale() }}">{{ __('Not Found') }}</html>

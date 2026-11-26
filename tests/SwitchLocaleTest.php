@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 use Localization\Http\ResolveLocale;
 use Localization\Language;
+use Localization\Tests\Fixtures\LocaleCode;
 use Localization\Tests\Fixtures\User;
 use PHPUnit\Framework\Attributes\DataProvider;
 
@@ -437,9 +438,6 @@ final class SwitchLocaleTest extends LanguagesTestCase
     public function test_the_readme_switcher_renders(): void
     {
         $this->app->setLocale('fr');
-        $translator = $this->app->make('translator');
-        $translator->addLines(['languages.fr' => 'Français', 'languages.ar' => 'Arabe'], 'fr');
-        $translator->addLines(['languages.ar' => 'العربية'], 'ar');
 
         $html = Blade::render(<<<'BLADE'
             @inject('localization', \Localization\Localization::class)
@@ -447,7 +445,7 @@ final class SwitchLocaleTest extends LanguagesTestCase
                 @csrf
                 <input type="hidden" name="to" value="/fr/terms">
                 @foreach ($localization->languages() as $language)
-                    <button name="locale" value="{{ $language->code }}" lang="{{ $language->code }}" @if ($language->current) aria-current="true" @endif>{{ __("languages.{$language->code}", locale: $language->code) }}</button>
+                    <button name="locale" value="{{ $language->code }}" lang="{{ $language->code }}" @if ($language->current) aria-current="true" @endif>{{ $language->name() }}</button>
                 @endforeach
             </form>
             BLADE);
@@ -513,6 +511,35 @@ final class SwitchLocaleTest extends LanguagesTestCase
     public function test_a_language_names_its_writing_direction(string $code, string $dir): void
     {
         $this->assertSame($dir, new Language($code, false)->dir());
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function names(): iterable
+    {
+        yield 'en' => ['en', 'English'];
+        yield 'fr' => ['fr', 'Français'];
+        yield 'ar' => ['ar', 'العربية'];
+        yield 'es' => ['es', 'Español'];
+        yield 'a lower-case prefix stays' => ['zu', 'isiZulu'];
+    }
+
+    #[DataProvider('names')]
+    public function test_a_language_is_named_in_itself_whatever_the_pages_language(string $code, string $name): void
+    {
+        foreach (['en', 'ar'] as $page) {
+            $this->app->setLocale($page);
+            $this->assertSame($name, Language::of($code)->name());
+        }
+    }
+
+    public function test_of_takes_a_code_or_a_string_backed_case_and_marks_the_pages_language_current(): void
+    {
+        $this->app->setLocale('fr');
+
+        $this->assertEquals(new Language('fr', true), Language::of('fr'));
+        $this->assertEquals(new Language('fr', true), Language::of(LocaleCode::fr));
+        $this->assertEquals(new Language('ar', false), Language::of(LocaleCode::ar));
+        $this->assertSame('rtl', Language::of(LocaleCode::ar)->dir());
     }
 
     public function test_yes_on_the_readme_banner_opens_their_language_and_saves_it(): void

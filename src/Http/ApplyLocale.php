@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Jaybizzle\CrawlerDetect\CrawlerDetect;
 use Localization\Locales;
 use Localization\LocalizedRoute;
+use Localization\MissingPage;
 use Localization\UserLocale;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -36,7 +37,8 @@ final class ApplyLocale
             return redirect()->to($target);
         }
 
-        $choice = ResolveLocale::choice($request, $locales, $account);
+        // The language on screen: a copy's, else a missing page's, else the visitor's; a bare copy shows the default.
+        $onScreen = $localized->locale ?? MissingPage::locale($request, $locales) ?? ResolveLocale::choice($request, $locales, $account);
         $pageView = self::opensThePage($request);
         $hop = is_string($request->route()?->getAction(RedirectToDefaultCopy::ACTION));
 
@@ -55,11 +57,10 @@ final class ApplyLocale
         // Page view only (a sibling's fetch can set Accept-Language); GET only (POST /locale saves the choice); not the
         // /en/… hop, which shows nothing: its landing fills it.
         if ($pageView && ! $hop && $request->isMethod('GET') && $account === null && UserLocale::hasColumn($user)) {
-            // The language on screen: a bare copy opened from outside shows the default.
-            rescue(static fn () => UserLocale::save($user, $localized->locale ?? $choice, unlessSet: $locales));
+            rescue(static fn () => UserLocale::save($user, $onScreen, unlessSet: $locales));
         }
 
-        app()->setLocale($localized->locale ?? $choice);
+        app()->setLocale($onScreen);
 
         return $next($request);
     }

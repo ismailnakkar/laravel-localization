@@ -8,6 +8,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Localization\Locales;
 use Localization\LocalizedRoute;
+use Localization\MissingPage;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -30,7 +31,7 @@ final class ResolveLocale
             return $next($request);
         }
 
-        app()->setLocale(LocalizedRoute::of($request->route())->locale ?? self::choice($request, $locales));
+        app()->setLocale(LocalizedRoute::of($request->route())->locale ?? MissingPage::locale($request, $locales) ?? self::choice($request, $locales));
 
         return $next($request);
     }

@@ -54,7 +54,10 @@ Each route gets a copy per language: `/terms` in the default, `/fr/terms` in Fre
 - Put only pages translated into every language inside, with their forms' POST routes.
 - Call `Route::localized()` outside prefix groups, before catch-all and fallback routes. Inside, prefix with
   `Route::prefix()->group()`, never a route-level `->prefix()`. Either prefix mistake throws.
-- An unmatched URL's 404 renders in `config('app.locale')` unless a `Route::fallback()` catches it.
+- A path no route matches, or only `Route::fallback()` does, renders in its first segment's language when that is a
+  code other than the default: `/fr/missing` 404s in French, whether your `errors/404` view, your fallback or your
+  exception handler renders it. Any other (`/missing`, `/en/missing`, `/xx/missing`) renders in `config('app.locale')`,
+  or in the visitor's language when a fallback in `web` catches it.
 - On Laravel 13, a POST catch-all inside `Route::domain()` shadows the switcher's `POST /locale`.
 
 ## The visitor's language
@@ -72,7 +75,7 @@ A copy renders its URL's language. Other pages in `web` render the visitor's: th
 
 It posts to `localization.switch`, which saves the language and returns to the same page in it. A signed page is
 re-signed only if its route is named and its signature is valid under the current `app.key`, else it comes back
-unchanged. Label each language in itself (`'fr' => 'Français'` in `lang/fr/languages.php`):
+unchanged. `$language->name()` names each language in itself, as a menu lists it:
 
 ```blade
 @inject('localization', \Localization\Localization::class)
@@ -80,16 +83,44 @@ unchanged. Label each language in itself (`'fr' => 'Français'` in `lang/fr/lang
     @csrf
     <input type="hidden" name="to" value="{{ request()->getRequestUri() }}">
     @foreach ($localization->languages() as $language)
-        <button name="locale" value="{{ $language->code }}" lang="{{ $language->code }}" @if ($language->current) aria-current="true" @endif>{{ __("languages.{$language->code}", locale: $language->code) }}</button>
+        <button name="locale" value="{{ $language->code }}" lang="{{ $language->code }}" @if ($language->current) aria-current="true" @endif>{{ $language->name() }}</button>
     @endforeach
 </form>
+```
+
+`name()` is ICU's name for the code in that language, its first letter capitalised: `English`, `Français`, `العربية`,
+`Español`; a name opening with a lower-case prefix keeps it (`isiZulu`). In a sentence, word it with your own lines, as
+French writes "en français".
+
+`Language::of($code)` builds the `Language` of any code, or of a string-backed enum case, `current` when the page is in
+it. Your own language enum can name itself through it:
+
+```php
+use Localization\Language;
+
+enum Locale: string
+{
+    case en = 'en';
+    case fr = 'fr';
+
+    public function label(): string
+    {
+        return Language::of($this)->name();
+    }
+
+    public function dir(): string
+    {
+        return Language::of($this)->dir();
+    }
+}
 ```
 
 ### Suggestion
 
 Anyone whose language differs from the page's gets one, except on signed pages, for crawlers and on
 [read-only requests](#read-only-requests). Render it in your layout, not in error views. Either answer is kept like a
-switcher choice, so the banner goes:
+switcher choice, so the banner goes. It words the languages with your own lines (`'fr' => 'français'` in
+`lang/fr/languages.php`), as they sit in a sentence:
 
 ```blade
 @inject('localization', \Localization\Localization::class)
@@ -239,7 +270,8 @@ The package adds three middleware to your `web` group, which must exist:
 | `$localization->suggestion()` | The visitor's `Language` while the page is in another, else `null`. |
 | `$localization->saveUserLocaleUsing(Closure)` | Saves the account's language your own way. |
 | `$localization->readOnlyWhen(Closure)` | [Read-only requests](#read-only-requests): no account save, no suggestion. |
-| `Language` | `code`; `current`, whether it is the page's language (always `false` for a suggestion); `dir()`, `rtl` or `ltr`. |
+| `Language` | `code`; `current`, whether it is the page's language (always `false` for a suggestion); `name()`, the language named in itself; `dir()`, `rtl` or `ltr`. |
+| `Language::of($code)` | Any code's `Language`, or a string-backed enum case's. |
 | `LocalizedRoute::of()`, `::copies()` | [A page's path in each language](#a-pages-path-in-each-language). |
 | `IntlDate::format()`, `IntlDate::locale()`, `DateForm` | [Dates](#dates). |
 | `POST /locale` (`localization.switch`) | The switcher: `locale`, and `to`, the page to return to. |
@@ -256,6 +288,22 @@ language. A visitor who chose a language is `withSession([ResolveLocale::PICKED_
 `withCookie(ResolveLocale::COOKIE, 'fr')`.
 
 ## Upgrading
+
+### From 0.14
+
+Nothing to change. An app can delete what the package now does:
+
+- Its own language names and directions. A language enum whose `label()` returns
+  `mb_ucfirst(\Locale::getDisplayName($code, $code))` and whose `dir()` reads `locale_is_right_to_left()` returns
+  `Language::of($this)->name()` and `Language::of($this)->dir()` (import `Localization\Language`). The names print as
+  before, except that a name opening with a lower-case prefix keeps it: `isiZulu`, not `IsiZulu`.
+- Its fallback route's lines that set the locale from the path's first segment, and the imports only they used. A path
+  no route matches, or only `Route::fallback()` does, now renders in its first segment's language when that is a code
+  other than the default, in `web` or not, where it rendered in `config('app.locale')` or the visitor's language; on a
+  fallback in `web`, an account without a language fills with it, as on a copy. `/en/missing`, the default's code,
+  renders like `/missing`: an app whose lines set the default for it too sees that one case change.
+
+Require `"ismailnakkar/laravel-localization": "^0.15"`.
 
 ### From 0.13
 

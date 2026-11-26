@@ -4,6 +4,23 @@ All notable changes are listed here, following [Keep a Changelog](https://keepac
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While 0.x, breaking changes bump the minor. Anything
 marked `@internal` may change in any release.
 
+## [0.15.0] - 2026-11-26
+
+### Added
+
+- `Language::name()`: the language named in itself (ICU's name for the code in that language), its first letter
+  capitalised as a menu lists it: `English`, `Français`, `العربية`, `Español`; `isiZulu` keeps its lower-case prefix.
+- `Language::of(BackedEnum|string $code)`: any code's `Language`, or a string-backed enum case's, `current` when the
+  page is in it, so an app's own language enum delegates its name and direction.
+
+### Changed
+
+- A path no route matches, or only `Route::fallback()` does, renders in its first segment's language when that is a
+  code other than the default (`/fr/missing` 404s in French, in `web` or not, whoever renders the page), where it used
+  `config('app.locale')` or the visitor's language. On a fallback in `web`, an account without a language fills with it,
+  as on a copy. Matched routes, unknown segments and the default's code (`/en/…`) are unchanged. See README Upgrading,
+  From 0.14.
+
 ## [0.14.0] - 2026-11-23
 
 ### Added
@@ -263,6 +280,7 @@ Extracted from laravel-seo 0.4.2 under new names. To upgrade, follow its
 
 - The switcher no longer doubles the base path in apps served from a subdirectory (`/app/app/terms`).
 
+[0.15.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.15.0
 [0.14.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.14.0
 [0.13.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.13.0
 [0.12.0]: https://github.com/ismailnakkar/laravel-localization/releases/tag/v0.12.0
